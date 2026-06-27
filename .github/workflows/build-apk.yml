@@ -10,9 +10,6 @@ jobs:
     name: Build Release APK
     runs-on: ubuntu-latest
 
-    env:
-      FLUTTER_VERSION: '3.32.0'
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,23 +23,33 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: '3.32.0'
           channel: 'stable'
           cache: true
+
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p "$ANDROID_SDK_ROOT/licenses"
+          printf '%s\n' \
+            "8933bad161af4178b1185d1a37fbf41ea5269c55" \
+            "d56f5187479451eabf01fb78af6dfcb131a6481e" \
+            "24333f8a63b6825ea9c5514f83c2829b004d1fee" \
+            "84831b9409646a918e30573bab4c9c91346d8abd" \
+            > "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
+
+      - name: Install Android platform-35 via sdkmanager
+        run: |
+          SDKM="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ -f "$SDKM" ]; then
+            "$SDKM" --install "platforms;android-35" "build-tools;35.0.0" 2>&1 || true
+          else
+            echo "sdkmanager not at $SDKM, skipping (pre-installed SDK should be sufficient)"
+          fi
 
       - name: Write android/local.properties
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT"  >  android/local.properties
           echo "sdk.dir=$ANDROID_SDK_ROOT"  >> android/local.properties
-          cat android/local.properties
-
-      - name: Accept Android SDK licenses
-        run: |
-          mkdir -p "$ANDROID_SDK_ROOT/licenses"
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" >> "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
 
       - name: Flutter clean
         run: flutter clean
@@ -50,8 +57,8 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build release APK
-        run: flutter build apk --release --verbose
+      - name: Build release APK (with stacktrace on failure)
+        run: flutter build apk --release --verbose 2>&1 || (echo "--- GRADLE STACKTRACE ---" && flutter build apk --release 2>&1 | tail -100 && exit 1)
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
