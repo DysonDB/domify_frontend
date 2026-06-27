@@ -23,7 +23,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.3'
+          flutter-version: '3.29.3'
           channel: 'stable'
           cache: true
 
@@ -37,15 +37,6 @@ jobs:
             "84831b9409646a918e30573bab4c9c91346d8abd" \
             > "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
 
-      - name: Install Android platform-35 via sdkmanager
-        run: |
-          SDKM="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          if [ -f "$SDKM" ]; then
-            "$SDKM" --install "platforms;android-35" "build-tools;35.0.0" 2>&1 || true
-          else
-            echo "sdkmanager not at $SDKM, skipping (pre-installed SDK should be sufficient)"
-          fi
-
       - name: Write android/local.properties
         run: |
           echo "flutter.sdk=$FLUTTER_ROOT"  >  android/local.properties
@@ -57,8 +48,8 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build release APK (with stacktrace on failure)
-        run: flutter build apk --release --verbose 2>&1 || (echo "--- GRADLE STACKTRACE ---" && flutter build apk --release 2>&1 | tail -100 && exit 1)
+      - name: Build release APK
+        run: flutter build apk --release --verbose
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
