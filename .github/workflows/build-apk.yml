@@ -27,10 +27,11 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install Android SDK packages
+      - name: Accept Android SDK licenses and install platform 35
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager \
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" \
             "platforms;android-35" \
             "build-tools;35.0.0" \
             "build-tools;34.0.0" \
@@ -38,14 +39,14 @@ jobs:
 
       - name: Write android/local.properties
         run: |
-          echo "flutter.sdk=$FLUTTER_ROOT"      >  android/local.properties
-          echo "sdk.dir=$ANDROID_SDK_ROOT"      >> android/local.properties
+          echo "flutter.sdk=$FLUTTER_ROOT"    >  android/local.properties
+          echo "sdk.dir=$ANDROID_SDK_ROOT"    >> android/local.properties
           cat android/local.properties
 
-      - name: Clean Flutter build artifacts
+      - name: Flutter clean
         run: flutter clean
 
-      - name: Get Flutter dependencies
+      - name: Flutter pub get
         run: flutter pub get
 
       - name: Build release APK
