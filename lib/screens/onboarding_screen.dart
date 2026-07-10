@@ -20,7 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
   final List<OnboardingPage> _pages = [
     OnboardingPage(
       title: 'Welcome to ',
-      highlightedWord: 'Domify',
+      highlightedWord: 'dnb Properties',
       description: 'Your trusted platform for verified property listings across Uganda.\nSmart properties, zero scams.',
       icon: Icons.home_rounded,
       gradient: [Color(0xFFFAFAFA), Color(0xFFF0F0F0)],
@@ -283,12 +283,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
                 ),
                 child: Center(
                   child: index == 0
-                      ? SvgPicture.asset(
-                          'assets/images/logo.svg',
-                          width: 220,
-                          height: 140,
-                          fit: BoxFit.contain,
-                        )
+                      ? Builder(builder: (ctx) {
+                          final isDark =
+                              Theme.of(ctx).brightness == Brightness.dark;
+                          return SvgPicture.asset(
+                            isDark
+                                ? 'assets/images/dnblogdark-removebg-preview.svg'
+                                : 'assets/images/dnblogolight-removebg-preview.svg',
+                            width: 180,
+                            height: 140,
+                            fit: BoxFit.contain,
+                          );
+                        })
                       : Icon(
                           page.icon,
                           size: 100,
@@ -300,7 +306,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
 
             SizedBox(height: 56),
 
-            // Title with gradient text for Domify
+            // Title with brand gradient on 'dnb Properties'
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(

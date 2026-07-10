@@ -228,7 +228,7 @@ class _SplashScreenState extends State<SplashScreen>
                                       ],
                                     ).createShader(bounds),
                                     child: const Text(
-                                      'DNB',
+                                      'dnb',
                                       style: TextStyle(
                                         fontSize: 40,
                                         fontWeight: FontWeight.w900,

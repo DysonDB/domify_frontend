@@ -710,7 +710,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   // ─── HELPERS ───────────────────────────────────────────────
   void _shareProperty(Property property) async {
     final text =
-        '🏠 Check out this property on Domify!\n${property.title}\n📍 ${property.location}\n💰 UGX ${_formatPrice(property.price)}';
+        '🏠 Check out this property on dnb Properties!\n${property.title}\n📍 ${property.location}\n💰 UGX ${_formatPrice(property.price)}';
     final uri = Uri.parse(
         'https://wa.me/?text=${Uri.encodeComponent(text)}');
     if (await canLaunchUrl(uri)) {

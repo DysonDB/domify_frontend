@@ -244,14 +244,14 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () {
                     showAboutDialog(
                       context: context,
-                      applicationName: 'Domify',
+                      applicationName: 'dnb Properties',
                       applicationVersion: '1.0.0',
                       applicationIcon: const FlutterLogo(size: 64),
-                      applicationLegalese: '© 2024 Domify. All rights reserved.',
+                      applicationLegalese: '© 2025 dnb Properties — NileBitLabs. All rights reserved.',
                       children: [
                         const SizedBox(height: 16),
                         const Text(
-                          'Domify is a modern real estate platform that helps you find your perfect property in Uganda. Browse through thousands of listings, compare properties, and book viewing appointments with ease.',
+                          'dnb Properties is a modern real estate platform by NileBitLabs that helps you find your perfect property in Uganda. Browse verified listings, compare properties, and book viewing appointments with ease.',
                         ),
                       ],
                     );
