@@ -244,14 +244,14 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () {
                     showAboutDialog(
                       context: context,
-                      applicationName: 'dnb Properties',
+                      applicationName: 'dnb Homes',
                       applicationVersion: '1.0.0',
                       applicationIcon: const FlutterLogo(size: 64),
-                      applicationLegalese: '© 2025 dnb Properties — NileBitLabs. All rights reserved.',
+                      applicationLegalese: '© 2025 dnb Homes — NileBitLabs. All rights reserved.',
                       children: [
                         const SizedBox(height: 16),
                         const Text(
-                          'dnb Properties is a modern real estate platform by NileBitLabs that helps you find your perfect property in Uganda. Browse verified listings, compare properties, and book viewing appointments with ease.',
+                          'dnb Homes is a modern real estate platform by NileBitLabs that helps you find your perfect property in Uganda. Browse verified listings, compare properties, and book viewing appointments with ease.',
                         ),
                       ],
                     );

@@ -20,7 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
   final List<OnboardingPage> _pages = [
     OnboardingPage(
       title: 'Welcome to ',
-      highlightedWord: 'dnb Properties',
+      highlightedWord: 'dnb Homes',
       description: 'Your trusted platform for verified property listings across Uganda.\nSmart properties, zero scams.',
       icon: Icons.home_rounded,
       gradient: [Color(0xFFFAFAFA), Color(0xFFF0F0F0)],
@@ -306,7 +306,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
 
             SizedBox(height: 56),
 
-            // Title with brand gradient on 'dnb Properties'
+            // Title with brand gradient on 'dnb Homes'
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(

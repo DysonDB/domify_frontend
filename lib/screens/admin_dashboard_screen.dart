@@ -596,7 +596,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
               child: Icon(Icons.admin_panel_settings, color: Colors.white, size: 20),
             ),
             SizedBox(width: 12),
-            Text('dnb Properties Admin', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text('dnb Homes Admin', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
