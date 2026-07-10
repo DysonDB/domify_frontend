@@ -198,52 +198,63 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildDynamicAppBar() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return SliverAppBar(
+      expandedHeight: 100,
       floating: true,
       pinned: true,
       elevation: 0,
       backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-      titleSpacing: 16,
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SvgPicture.asset(
-            isDark
-                ? 'assets/images/dnblogdark-removebg-preview.svg'
-                : 'assets/images/dnblogolight-removebg-preview.svg',
-            width: 38,
-            height: 38,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'Homes',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFFA17324),
-              letterSpacing: 0.5,
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.only(left: 16, bottom: 12),
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              child: SvgPicture.asset(
+                isDark
+                    ? 'assets/images/dnblogdark-removebg-preview.svg'
+                    : 'assets/images/dnblogolight-removebg-preview.svg',
+                width: 38,
+                height: 38,
+                fit: BoxFit.contain,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              child: const Text(
+                'Homes',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFA17324),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+        Container(
+          margin: const EdgeInsets.only(top: 14),
+          child: IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.settings_outlined,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
             ),
-            child: Icon(
-              Icons.settings_outlined,
-              color: Theme.of(context).colorScheme.primary,
-              size: 20,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
             ),
-          ),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SettingsScreen()),
           ),
         ),
         const SizedBox(width: 16),
