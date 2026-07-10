@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:video_player/video_player.dart';
 import '../models/property_model.dart';
 import '../services/api_service.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/compare_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'property_detail_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -19,6 +21,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   final Map<String, PageController> _imageControllers = {};
+  final Map<String, VideoPlayerController> _videoControllers = {};
 
   List<Property> _properties = [];
   bool _isLoading = true;
@@ -51,8 +54,13 @@ class _ExploreScreenState extends State<ExploreScreen>
     try {
       final properties = await ApiService.getAllProperties();
       if (mounted) {
+        // Sort: properties with videos come first
+        final withVideos =
+            properties.where((p) => p.videos.isNotEmpty).toList();
+        final withoutVideos =
+            properties.where((p) => p.videos.isEmpty).toList();
         setState(() {
-          _properties = properties;
+          _properties = [...withVideos, ...withoutVideos];
           _isLoading = false;
         });
       }
@@ -91,6 +99,9 @@ class _ExploreScreenState extends State<ExploreScreen>
     _pageController.dispose();
     for (final c in _imageControllers.values) {
       c.dispose();
+    }
+    for (final v in _videoControllers.values) {
+      v.dispose();
     }
     super.dispose();
   }
@@ -164,27 +175,45 @@ class _ExploreScreenState extends State<ExploreScreen>
   // ─── PROPERTY SLIDE ────────────────────────────────────────
   Widget _buildPropertySlide(Property property) {
     final images = property.images;
+    final videos = property.videos;
+    final hasVideo = videos.isNotEmpty;
     final controller = _getImageController(property.id);
 
+    // Total media: video first (if any), then images
+    final totalMedia = (hasVideo ? 1 : 0) + images.length;
+
     return GestureDetector(
-      // Tap left/right sides to switch images (like Instagram Stories)
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                PropertyDetailScreen(propertyId: property.id),
+          ),
+        );
+      },
       onTapUp: (details) {
         final screenWidth = MediaQuery.of(context).size.width;
         if (details.globalPosition.dx < screenWidth * 0.3) {
-          _prevImage(controller, images.length);
+          _prevImage(controller, totalMedia);
         } else if (details.globalPosition.dx > screenWidth * 0.7) {
-          _nextImage(controller, images.length);
+          _nextImage(controller, totalMedia);
         }
       },
       child: PageView.builder(
         controller: controller,
-        itemCount: images.length,
+        itemCount: totalMedia,
         onPageChanged: (index) {
           setState(() => _currentImageIndex = index);
         },
         itemBuilder: (context, imgIndex) {
+          // First item is video if available
+          if (hasVideo && imgIndex == 0) {
+            return _buildVideoSlide(videos[0], property.id);
+          }
+          final imageIndex = hasVideo ? imgIndex - 1 : imgIndex;
           return Image.network(
-            images[imgIndex],
+            images[imageIndex],
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
@@ -199,12 +228,72 @@ class _ExploreScreenState extends State<ExploreScreen>
             errorBuilder: (_, __, ___) => Container(
               color: Colors.grey[900],
               child: const Center(
-                child: Icon(Icons.broken_image, color: Colors.grey, size: 48),
+                child:
+                    Icon(Icons.broken_image, color: Colors.grey, size: 48),
               ),
             ),
           );
         },
       ),
+    );
+  }
+
+  Widget _buildVideoSlide(String videoUrl, String propertyId) {
+    if (!_videoControllers.containsKey(propertyId)) {
+      final ctrl = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+      _videoControllers[propertyId] = ctrl;
+      ctrl.initialize().then((_) {
+        if (mounted) {
+          ctrl.setLooping(true);
+          ctrl.play();
+          setState(() {});
+        }
+      });
+    }
+    final ctrl = _videoControllers[propertyId]!;
+    if (!ctrl.value.isInitialized) {
+      return Shimmer.fromColors(
+        baseColor: Colors.grey[900]!,
+        highlightColor: Colors.grey[700]!,
+        child: Container(color: Colors.grey[900]),
+      );
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: ctrl.value.size.width,
+            height: ctrl.value.size.height,
+            child: VideoPlayer(ctrl),
+          ),
+        ),
+        // Video play/pause indicator
+        Positioned(
+          bottom: 80,
+          left: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.videocam, color: Colors.white, size: 14),
+                SizedBox(width: 4),
+                Text('VIDEO TOUR',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

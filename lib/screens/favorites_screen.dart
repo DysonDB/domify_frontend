@@ -33,6 +33,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  Set<String> _trackedFavoriteIds = {};
 
   @override
   void initState() {
@@ -40,6 +41,18 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     _initializeAnimations();
     _loadFavoriteProperties();
     _setupScrollListener();
+    // Listen for external favorites changes (e.g. added from Home/Explore)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<FavoritesProvider>(context, listen: false)
+            .addListener(_onFavoritesChanged);
+      }
+    });
+  }
+
+  void _onFavoritesChanged() {
+    if (!mounted) return;
+    _loadFavoriteProperties();
   }
 
   void _initializeAnimations() {
@@ -173,6 +186,14 @@ class _FavoritesScreenState extends State<FavoritesScreen>
 
   @override
   void dispose() {
+    // Clean up the favorites listener
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // ignore: use_build_context_synchronously
+    });
+    try {
+      Provider.of<FavoritesProvider>(context, listen: false)
+          .removeListener(_onFavoritesChanged);
+    } catch (_) {}
     _fabAnimationController.dispose();
     _headerAnimationController.dispose();
     _searchAnimationController.dispose();
@@ -277,9 +298,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                             children: [
                               Row(
                                 children: [
-                                  Hero(
-                                    tag: 'favorites-icon',
-                                    child: Container(
+                                   Container(
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withOpacity(0.2),
@@ -296,13 +315,12 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                                           ),
                                         ],
                                       ),
-                                      child: Icon(
+                                      child: const Icon(
                                         Icons.favorite_rounded,
                                         color: Colors.white,
                                         size: 32,
                                       ),
                                     ),
-                                  ),
                                   const SizedBox(width: 20),
                                   Expanded(
                                     child: Column(

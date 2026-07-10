@@ -179,7 +179,7 @@ class _CompareScreenState extends State<CompareScreen>
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(context).maybePop(),
               icon: const Icon(Icons.home),
               label: const Text('Go Back'),
               style: ElevatedButton.styleFrom(
@@ -229,7 +229,7 @@ class _CompareScreenState extends State<CompareScreen>
             ),
             const SizedBox(height: 32),
             ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(context).maybePop(),
               icon: const Icon(Icons.search),
               label: const Text('Find Properties'),
               style: ElevatedButton.styleFrom(
@@ -289,7 +289,7 @@ class _CompareScreenState extends State<CompareScreen>
                 Icons.arrow_back,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(context).maybePop(),
             ),
           ),
           Expanded(

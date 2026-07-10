@@ -11,6 +11,16 @@ import 'settings_screen.dart';
 import 'all_properties_screen.dart';
 import 'loading_screen.dart';
 
+/// Maps display category name → PropertyType enum name
+const Map<String, String> _categoryTypeMap = {
+  'Apartment': 'apartment',
+  'House': 'house',
+  'Villa': 'villa',
+  'Land': 'land',
+  'Commercial': 'commercial',
+  'Studio': 'studio',
+};
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -30,26 +40,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   final List<String> _categories = [
     'All',
-    'Apartments',
-    'Houses',
-    'Condos',
-    'Villas'
+    'Apartment',
+    'House',
+    'Villa',
+    'Land',
+    'Commercial',
+    'Studio',
   ];
 
   final List<Map<String, dynamic>> _quickActions = [
     {
-      'icon': Icons.account_balance_outlined,
-      'label': 'Mortgage',
+      'icon': Icons.search_rounded,
+      'label': 'Filter',
       'color': Color(0xFF178F5B)
     },
     {
-      'icon': Icons.map_outlined,
-      'label': 'Map View',
+      'icon': Icons.fiber_new_rounded,
+      'label': 'New Listings',
       'color': Color(0xFF1A3C6E)
     },
     {
-      'icon': Icons.trending_up_rounded,
-      'label': 'Analytics',
+      'icon': Icons.explore_rounded,
+      'label': 'Explore',
       'color': Color(0xFFA17324)
     },
     {
@@ -58,6 +70,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       'color': Color(0xFF178F5B)
     },
   ];
+
+  List<Property> _filterByCategory(List<Property> properties) {
+    if (_selectedCategory == 'All') return properties;
+    final targetType = _categoryTypeMap[_selectedCategory];
+    if (targetType == null) return properties;
+    return properties
+        .where((p) =>
+            p.type.toString().split('.').last.toLowerCase() == targetType)
+        .toList();
+  }
 
   @override
   void initState() {
@@ -174,6 +196,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildDynamicAppBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SliverAppBar(
       expandedHeight: 100,
       floating: true,
@@ -186,7 +209,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Container(
               margin: const EdgeInsets.only(top: 6),
               child: SvgPicture.asset(
-                'assets/images/app_logo.svg',
+                isDark
+                    ? 'assets/images/dnblogdark-removebg-preview.svg'
+                    : 'assets/images/dnblogolight-removebg-preview.svg',
                 width: 48,
                 height: 48,
               ),
@@ -203,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         colors: [Color(0xFF178F5B), Color(0xFF1A3C6E)],
                       ).createShader(bounds),
                       child: const Text(
-                        'Domi',
+                        'DNB',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
@@ -212,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     const Text(
-                      'fy',
+                      ' Properties',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
@@ -338,6 +363,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _handleQuickAction(String label) {
+    switch (label) {
+      case 'Filter':
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const FilterScreen()),
+        );
+        break;
+      case 'New Listings':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AllPropertiesScreen(
+              title: 'New Listings',
+              initialProperties: _recentProperties,
+              showFeaturedOnly: false,
+            ),
+          ),
+        );
+        break;
+      case 'Explore':
+        setState(() => _currentIndex = 2);
+        break;
+      case 'Saved':
+        setState(() => _currentIndex = 1);
+        break;
+    }
+  }
+
   Widget _buildQuickActions() {
     return SliverToBoxAdapter(
       child: Container(
@@ -350,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () {},
+                    onTap: () => _handleQuickAction(action['label'] as String),
                     borderRadius: BorderRadius.circular(16),
                     child: Ink(
                       decoration: BoxDecoration(
@@ -494,6 +548,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFeaturedSection() {
+    final filtered = _filterByCategory(_featuredProperties);
     return SliverToBoxAdapter(
       child: Column(
         children: [
@@ -505,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               MaterialPageRoute(
                 builder: (context) => AllPropertiesScreen(
                   title: 'Featured Properties',
-                  initialProperties: _featuredProperties,
+                  initialProperties: filtered,
                   showFeaturedOnly: true,
                 ),
               ),
@@ -513,9 +568,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           SizedBox(
             height: 280,
-            child: _featuredProperties.isEmpty
+            child: filtered.isEmpty
                 ? _buildEmptyState('No featured properties', Icons.star_outline)
-                : _buildHorizontalPropertyList(_featuredProperties),
+                : _buildHorizontalPropertyList(filtered),
           ),
         ],
       ),
@@ -523,6 +578,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildRecentSection() {
+    final filtered = _filterByCategory(_recentProperties);
     return SliverToBoxAdapter(
       child: Column(
         children: [
@@ -534,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               MaterialPageRoute(
                 builder: (context) => AllPropertiesScreen(
                   title: 'Recent Listings',
-                  initialProperties: _recentProperties,
+                  initialProperties: filtered,
                   showFeaturedOnly: false,
                 ),
               ),
@@ -542,9 +598,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           SizedBox(
             height: 280,
-            child: _recentProperties.isEmpty
+            child: filtered.isEmpty
                 ? _buildEmptyState('No recent properties', Icons.access_time)
-                : _buildHorizontalPropertyList(_recentProperties),
+                : _buildHorizontalPropertyList(filtered),
           ),
         ],
       ),
@@ -552,6 +608,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildAllPropertiesSection() {
+    final filtered = _filterByCategory(_allProperties);
+    final displayed = filtered.take(6).toList();
     return SliverToBoxAdapter(
       child: Column(
         children: [
@@ -563,27 +621,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               MaterialPageRoute(
                 builder: (context) => AllPropertiesScreen(
                   title: 'All Properties',
-                  initialProperties: _allProperties,
+                  initialProperties: filtered,
                   showFeaturedOnly: false,
                 ),
               ),
             ),
           ),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: _allProperties.take(6).length,
-            itemBuilder: (context, index) {
-              return PropertyCard(propertyId: _allProperties[index].id);
-            },
-          ),
+          displayed.isEmpty
+              ? _buildEmptyState(
+                  'No properties in this category', Icons.home_outlined)
+              : GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount:
+                        MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: displayed.length,
+                  itemBuilder: (context, index) {
+                    return PropertyCard(propertyId: displayed[index].id);
+                  },
+                ),
         ],
       ),
     );
@@ -748,7 +810,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               _buildNavItem(1, Icons.favorite_rounded, 'Favorites'),
               _buildNavItem(2, Icons.explore_rounded, 'Explore'),
               _buildNavItem(3, Icons.compare_arrows_rounded, 'Compare'),
-              _buildNavItem(4, Icons.person_rounded, 'Profile'),
+              _buildNavItem(4, Icons.settings_rounded, 'Settings'),
             ],
           ),
         ),
@@ -789,13 +851,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               children: [
                 if (isLogo)
                   SvgPicture.asset(
-                    'assets/images/app_logo.svg',
+                    isDark
+                        ? 'assets/images/dnblogdark-removebg-preview.svg'
+                        : 'assets/images/dnblogolight-removebg-preview.svg',
                     width: 28,
                     height: 28,
-                    colorFilter: ColorFilter.mode(
-                      color,
-                      BlendMode.srcIn,
-                    ),
                   )
                 else
                   Icon(

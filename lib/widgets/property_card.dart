@@ -6,6 +6,7 @@ import '../providers/favorites_provider.dart';
 import '../providers/compare_provider.dart';
 import 'image_carousel.dart';
 import '../services/api_service.dart';
+import '../screens/property_detail_screen.dart';
 
 class PropertyCard extends StatefulWidget {
   final String propertyId;
@@ -49,135 +50,169 @@ class _PropertyCardState extends State<PropertyCard> {
     }
   }
 
+  void _openDetail(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PropertyDetailScreen(propertyId: widget.propertyId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildSkeletonLoader();
-    }
+    if (_isLoading) return _buildSkeletonLoader();
+    if (_error != null || _property == null) return _buildErrorState();
 
-    if (_error != null || _property == null) {
-      return _buildErrorState();
-    }
+    return GestureDetector(
+      onTap: () => _openDetail(context),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final availableHeight = constraints.maxHeight;
+            final textSectionHeight = availableHeight * 0.32;
+            final imageSectionHeight = availableHeight - textSectionHeight;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final availableHeight = constraints.maxHeight;
-          final textSectionHeight = availableHeight * 0.32;
-          final imageSectionHeight = availableHeight - textSectionHeight;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image section
-              SizedBox(
-                height: imageSectionHeight,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ImageCarousel(
-                      images: _property!.images,
-                    ),
-                    // Action buttons
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildFavoriteButton(),
-                          _buildCompareButton(),
-                        ],
-                      ),
-                    ),
-                    // Purpose badge
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _purposeColor(_property!.purpose.toString().split('.').last),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _property!.purpose.toString().split('.').last.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Text section
-              SizedBox(
-                height: textSectionHeight,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Image section
+                SizedBox(
+                  height: imageSectionHeight,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Text(
-                        _property!.title,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                      ImageCarousel(images: _property!.images),
+                      // Action buttons
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildFavoriteButton(),
+                            _buildCompareButton(),
+                          ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 12,
-                            color: Colors.grey[500],
+                      // Purpose badge
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                          const SizedBox(width: 2),
-                          Expanded(
-                            child: Text(
-                              _property!.location,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          decoration: BoxDecoration(
+                            color: _purposeColor(
+                                _property!.purpose.toString().split('.').last),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            _property!.purpose
+                                .toString()
+                                .split('.')
+                                .last
+                                .toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                        ],
-                      ),
-                      Text(
-                        'UGX ${_formatPrice(_property!.price)}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).primaryColor,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
+                      // Video indicator
+                      if (_property!.videos.isNotEmpty)
+                        Positioned(
+                          bottom: 6,
+                          left: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.videocam, color: Colors.white, size: 12),
+                                SizedBox(width: 3),
+                                Text(
+                                  'VIDEO',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+                // Text section
+                SizedBox(
+                  height: textSectionHeight,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _property!.title,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_outlined,
+                                size: 12, color: Colors.grey[500]),
+                            const SizedBox(width: 2),
+                            Expanded(
+                              child: Text(
+                                _property!.location,
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey[600]),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'UGX ${_formatPrice(_property!.price)}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -228,7 +263,9 @@ class _PropertyCardState extends State<PropertyCard> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isInCompare ? Icons.compare_arrows : Icons.compare_arrows_outlined,
+              isInCompare
+                  ? Icons.compare_arrows
+                  : Icons.compare_arrows_outlined,
               color: isInCompare ? Colors.cyanAccent : Colors.white,
               size: 16,
             ),
@@ -241,9 +278,7 @@ class _PropertyCardState extends State<PropertyCard> {
   Widget _buildSkeletonLoader() {
     return Card(
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Shimmer.fromColors(
         baseColor: Colors.grey[300]!,
         highlightColor: Colors.grey[100]!,
@@ -260,7 +295,10 @@ class _PropertyCardState extends State<PropertyCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(width: double.infinity, height: 12, color: Colors.white),
+                      Container(
+                          width: double.infinity,
+                          height: 12,
+                          color: Colors.white),
                       const SizedBox(height: 6),
                       Container(width: 120, height: 10, color: Colors.white),
                       const SizedBox(height: 6),
@@ -279,19 +317,15 @@ class _PropertyCardState extends State<PropertyCard> {
   Widget _buildErrorState() {
     return Card(
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.error_outline, color: Colors.grey[400], size: 32),
             const SizedBox(height: 4),
-            Text(
-              'Failed to load',
-              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-            ),
+            Text('Failed to load',
+                style: TextStyle(fontSize: 11, color: Colors.grey[500])),
           ],
         ),
       ),
