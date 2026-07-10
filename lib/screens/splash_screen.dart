@@ -239,7 +239,7 @@ class _SplashScreenState extends State<SplashScreen>
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'Properties',
+                                    'Homes',
                                     style: TextStyle(
                                       fontSize: 28,
                                       fontWeight: FontWeight.w300,
