@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'providers/theme_provider.dart';
+import 'providers/settings_provider.dart';
 import 'providers/favorites_provider.dart';
 import 'providers/compare_provider.dart';
 
@@ -19,6 +20,7 @@ void main() async {
       providers: [
         Provider<LocalStorageService>.value(value: storage),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
         ChangeNotifierProvider(create: (_) => CompareProvider(storage)),
 
@@ -39,7 +41,7 @@ class MyApp extends StatelessWidget {
           title: 'dnb Homes',
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          themeMode: themeProvider.themeMode,
           debugShowCheckedModeBanner: false,
           home: const SplashScreen(),
         );
