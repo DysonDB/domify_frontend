@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
+import 'about_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_of_service_screen.dart';
+import 'safety_tips_screen.dart';
+import 'profile_screen.dart';
+import 'viewing_history_screen.dart';
+import 'appointments_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -84,14 +93,15 @@ class _AppearanceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
+    return Consumer2<ThemeProvider, SettingsProvider>(
       builder: (
         BuildContext context,
         ThemeProvider themeProvider,
+        SettingsProvider settings,
         Widget? child,
       ) {
         return _SettingsSection(
-          title: 'Appearance',
+          title: settings.translate('appearance_txt'),
           icon: Icons.palette_outlined,
           accentColor: const Color(0xFF178F5B),
           children: <Widget>[
@@ -118,13 +128,13 @@ class _NotificationsSection extends StatelessWidget {
         Widget? child,
       ) {
         return _SettingsSection(
-          title: 'Notifications',
+          title: 'Notifications', // Or translate if needed
           icon: Icons.notifications_none_rounded,
           accentColor: const Color(0xFF1A3C6E),
           children: <Widget>[
             _SettingsSwitchTile(
               icon: Icons.home_work_outlined,
-              title: 'Property Updates',
+              title: settings.translate('property_updates'),
               subtitle: 'New verified listings and market matches',
               value: settings.propertyUpdatesEnabled,
               onChanged: settings.setPropertyUpdatesEnabled,
@@ -132,7 +142,7 @@ class _NotificationsSection extends StatelessWidget {
             _SettingsDivider(),
             _SettingsSwitchTile(
               icon: Icons.event_available_outlined,
-              title: 'Appointment Reminders',
+              title: settings.translate('appointment_reminders'),
               subtitle: 'Viewing reminders before scheduled visits',
               value: settings.appointmentRemindersEnabled,
               onChanged: settings.setAppointmentRemindersEnabled,
@@ -140,7 +150,7 @@ class _NotificationsSection extends StatelessWidget {
             _SettingsDivider(),
             _SettingsSwitchTile(
               icon: Icons.trending_up_rounded,
-              title: 'Price Changes',
+              title: settings.translate('price_changes'),
               subtitle: 'Alerts when saved property prices move',
               value: settings.priceChangesEnabled,
               onChanged: settings.setPriceChangesEnabled,
@@ -155,14 +165,14 @@ class _NotificationsSection extends StatelessWidget {
 class _AccountSection extends StatelessWidget {
   const _AccountSection();
 
+  void _push(BuildContext context, Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<SettingsProvider>(
-      builder: (
-        BuildContext context,
-        SettingsProvider settings,
-        Widget? child,
-      ) {
+      builder: (BuildContext context, SettingsProvider settings, Widget? child) {
         return _SettingsSection(
           title: 'Account',
           icon: Icons.account_circle_outlined,
@@ -172,138 +182,25 @@ class _AccountSection extends StatelessWidget {
               icon: Icons.person_outline_rounded,
               title: 'Profile',
               subtitle: settings.profileName,
-              onTap: () => _showProfileEditor(context, settings),
+              onTap: () => _push(context, const ProfileScreen()),
             ),
             _SettingsDivider(),
             _SettingsActionTile(
               icon: Icons.history_rounded,
-              title: 'Viewing History',
-              subtitle: 'Review and clear recent searches',
-              onTap: () => _showViewingHistory(context),
+              title: settings.translate('viewing_history'),
+              subtitle: 'Properties you have recently viewed',
+              onTap: () => _push(context, const ViewingHistoryScreen()),
             ),
             _SettingsDivider(),
             _SettingsActionTile(
               icon: Icons.calendar_today_outlined,
-              title: 'Appointments',
-              subtitle: 'View appointment reminder status',
-              onTap: () => _showAppointments(context, settings),
+              title: settings.translate('appointments'),
+              subtitle: 'Manage your property viewing bookings',
+              onTap: () => _push(context, const AppointmentsScreen()),
             ),
           ],
         );
       },
-    );
-  }
-
-  Future<void> _showProfileEditor(
-    BuildContext context,
-    SettingsProvider settings,
-  ) async {
-    final TextEditingController nameController =
-        TextEditingController(text: settings.profileName);
-    final TextEditingController phoneController =
-        TextEditingController(text: settings.profilePhone);
-    final TextEditingController emailController =
-        TextEditingController(text: settings.profileEmail);
-
-    final bool? saved = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Profile'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-                textInputAction: TextInputAction.next,
-              ),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(labelText: 'Phone'),
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-              ),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-            ],
-          ),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-
-    if (saved == true) {
-      await settings.updateProfile(
-        name: nameController.text,
-        phone: phoneController.text,
-        email: emailController.text,
-      );
-    }
-
-    nameController.dispose();
-    phoneController.dispose();
-    emailController.dispose();
-  }
-
-  Future<void> _showViewingHistory(BuildContext context) async {
-    final SettingsProvider settings = context.read<SettingsProvider>();
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Viewing History'),
-        content: const Text(
-          'Recent searches are stored locally on this device and can be cleared from cache.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () async {
-              await settings.clearCachePreferences();
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Clear History'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showAppointments(
-    BuildContext context,
-    SettingsProvider settings,
-  ) async {
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Appointments'),
-        content: Text(
-          settings.appointmentRemindersEnabled
-              ? 'Appointment reminders are active for property viewings.'
-              : 'Appointment reminders are currently turned off.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -326,7 +223,7 @@ class _AppSettingsSection extends StatelessWidget {
           children: <Widget>[
             _SettingsActionTile(
               icon: Icons.language_rounded,
-              title: 'Language',
+              title: settings.translate('language_txt'),
               subtitle: settings.language,
               trailingText: settings.language,
               onTap: () => _showLanguagePicker(context, settings),
@@ -334,7 +231,7 @@ class _AppSettingsSection extends StatelessWidget {
             _SettingsDivider(),
             _SettingsActionTile(
               icon: Icons.currency_exchange_rounded,
-              title: 'Currency',
+              title: settings.translate('currency_txt'),
               subtitle: settings.currencyName,
               trailingText: settings.currency,
               onTap: () => _showCurrencyPicker(context, settings),
@@ -342,7 +239,7 @@ class _AppSettingsSection extends StatelessWidget {
             _SettingsDivider(),
             _SettingsActionTile(
               icon: Icons.cleaning_services_outlined,
-              title: 'Clear Cache',
+              title: settings.translate('clear_cache_txt'),
               subtitle: 'Remove recent searches and temporary app data',
               onTap: () => _confirmClearCache(context, settings),
             ),
@@ -423,6 +320,30 @@ class _AppSettingsSection extends StatelessWidget {
 class _AboutSection extends StatelessWidget {
   const _AboutSection();
 
+  void _push(BuildContext context, Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
+  Future<void> _rateApp() async {
+    // Replace with actual Play Store ID when published
+    const String storeUrl =
+        'https://play.google.com/store/apps/details?id=com.nilebitlabs.dnbhomes';
+    final uri = Uri.parse(storeUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _shareApp(BuildContext context) async {
+    await Share.share(
+      '🏠 Find your next home with dnb Homes!\n\n'
+      'Browse thousands of verified properties in Uganda — buy, rent, or stay.\n\n'
+      '📲 Download: https://nilebitlabs.com/dnb-homes\n\n'
+      'dnb Homes — Where home begins.',
+      subject: 'dnb Homes — Property Search App',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return _SettingsSection(
@@ -433,79 +354,54 @@ class _AboutSection extends StatelessWidget {
         _SettingsActionTile(
           icon: Icons.apartment_rounded,
           title: 'About App',
-          subtitle: 'dnb Homes version and product details',
-          onTap: () => _showAboutApp(context),
+          subtitle: 'dnb Homes — version, mission and team',
+          onTap: () => _push(context, const AboutScreen()),
         ),
         _SettingsDivider(),
         _SettingsActionTile(
           icon: Icons.privacy_tip_outlined,
           title: 'Privacy Policy',
-          subtitle: 'How data and permissions are handled',
-          onTap: () => _showLegalDialog(
-            context: context,
-            title: 'Privacy Policy',
-            body:
-                'dnb Homes stores preferences locally on this device and uses permissions only for app features such as maps, media, notifications, and property discovery.',
-          ),
+          subtitle: 'How your data and permissions are handled',
+          onTap: () => _push(context, const PrivacyPolicyScreen()),
         ),
         _SettingsDivider(),
         _SettingsActionTile(
           icon: Icons.description_outlined,
           title: 'Terms of Service',
           subtitle: 'Rules for using the platform',
-          onTap: () => _showLegalDialog(
-            context: context,
-            title: 'Terms of Service',
-            body:
-                'Use dnb Homes for lawful property discovery, comparison, and appointment booking. Listing details should be verified before payment or commitment.',
-          ),
+          onTap: () => _push(context, const TermsOfServiceScreen()),
+        ),
+        _SettingsDivider(),
+        _SettingsActionTile(
+          icon: Icons.shield_rounded,
+          title: 'Safety Tips',
+          subtitle: 'How to stay safe in every transaction',
+          onTap: () => _push(context, const SafetyTipsScreen()),
+        ),
+        _SettingsDivider(),
+        _SettingsActionTile(
+          icon: Icons.star_rounded,
+          title: 'Rate on Play Store',
+          subtitle: 'Love the app? Leave us a 5-star review!',
+          trailingText: '⭐',
+          onTap: _rateApp,
+        ),
+        _SettingsDivider(),
+        _SettingsActionTile(
+          icon: Icons.share_rounded,
+          title: 'Share App',
+          subtitle: 'Invite friends & family to dnb Homes',
+          onTap: () => _shareApp(context),
+        ),
+        _SettingsDivider(),
+        _SettingsActionTile(
+          icon: Icons.info_rounded,
+          title: 'App Version',
+          subtitle: 'dnb Homes v1.0.0 — Build 1',
+          trailingText: 'v1.0.0',
+          onTap: () {},
         ),
       ],
-    );
-  }
-
-  void _showAboutApp(BuildContext context) {
-    showAboutDialog(
-      context: context,
-      applicationName: 'dnb Homes',
-      applicationVersion: '1.0.0',
-      applicationIcon: Container(
-        width: 58,
-        height: 58,
-        decoration: const BoxDecoration(
-          color: Color(0xFF178F5B),
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.home_work_rounded, color: Colors.white),
-      ),
-      applicationLegalese:
-          '© 2025 dnb Homes — NileBitLabs. All rights reserved.',
-      children: const <Widget>[
-        SizedBox(height: 16),
-        Text(
-          'dnb Homes is a modern real estate platform by NileBitLabs that helps you find your perfect property in Uganda.',
-        ),
-      ],
-    );
-  }
-
-  Future<void> _showLegalDialog({
-    required BuildContext context,
-    required String title,
-    required String body,
-  }) async {
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -617,31 +513,81 @@ class _ThemeModeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 10),
-      child: SegmentedButton<ThemeMode>(
-        segments: const <ButtonSegment<ThemeMode>>[
-          ButtonSegment<ThemeMode>(
-            value: ThemeMode.light,
-            icon: Icon(Icons.light_mode_outlined),
-            label: Text('Light'),
-          ),
-          ButtonSegment<ThemeMode>(
-            value: ThemeMode.dark,
-            icon: Icon(Icons.dark_mode_outlined),
-            label: Text('Dark'),
-          ),
-          ButtonSegment<ThemeMode>(
-            value: ThemeMode.system,
-            icon: Icon(Icons.settings_suggest_outlined),
-            label: Text('System'),
-          ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = const Color(0xFF178F5B);
+    final secondaryColor = const Color(0xFF1A3C6E);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          _buildTab(context, ThemeMode.light, Icons.light_mode_rounded, 'Light', primaryColor),
+          _buildTab(context, ThemeMode.dark, Icons.dark_mode_rounded, 'Dark', secondaryColor),
+          _buildTab(context, ThemeMode.system, Icons.settings_suggest_rounded, 'System', const Color(0xFFA17324)),
         ],
-        selected: <ThemeMode>{selectedMode},
-        showSelectedIcon: false,
-        onSelectionChanged: (Set<ThemeMode> selected) {
-          onChanged(selected.first);
-        },
+      ),
+    );
+  }
+
+  Widget _buildTab(BuildContext context, ThemeMode mode, IconData icon, String label, Color accentColor) {
+    final isSelected = selectedMode == mode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(mode),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? (isDark ? const Color(0xFF0F172A) : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    )
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected
+                    ? accentColor
+                    : (isDark ? Colors.white54 : Colors.black54),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                  color: isSelected
+                      ? (isDark ? Colors.white : Colors.black87)
+                      : (isDark ? Colors.white54 : Colors.black54),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

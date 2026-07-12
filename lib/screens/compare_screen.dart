@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/property_model.dart';
 import '../providers/compare_provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/api_service.dart';
-import '../widgets/property_card.dart';
+import '../screens/property_detail_screen.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ULTRA-PREMIUM COMPARE SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
 class CompareScreen extends StatefulWidget {
   final VoidCallback? onGoHome;
-
   const CompareScreen({super.key, this.onGoHome});
 
   @override
@@ -19,51 +22,37 @@ class _CompareScreenState extends State<CompareScreen>
   List<Property> _properties = [];
   bool _isLoading = false;
   String? _error;
-  late AnimationController _slideController;
-  late AnimationController _fadeController;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _fadeAnimation;
   int _selectedTab = 0;
-
-  // Track last known compare list to detect changes
   List<String> _lastCompareIds = [];
+
+  late AnimationController _entryController;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
 
   @override
   void initState() {
     super.initState();
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 700),
+    _entryController = AnimationController(
       vsync: this,
+      duration: const Duration(milliseconds: 500),
     );
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 700),
-      vsync: this,
-    );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
+    _fadeAnim = CurvedAnimation(
+        parent: _entryController, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
+        parent: _entryController, curve: Curves.easeOutCubic));
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // React to compare list changes (e.g. user added from home tab)
-    final compareIds =
-        List<String>.from(Provider.of<CompareProvider>(context).compareList);
-    if (_listsDiffer(compareIds, _lastCompareIds)) {
-      _lastCompareIds = compareIds;
-      _loadProperties(compareIds);
+    final ids = List<String>.from(
+        Provider.of<CompareProvider>(context).compareList);
+    if (_listsDiffer(ids, _lastCompareIds)) {
+      _lastCompareIds = ids;
+      _loadProperties(ids);
     }
   }
 
@@ -77,8 +66,7 @@ class _CompareScreenState extends State<CompareScreen>
 
   @override
   void dispose() {
-    _slideController.dispose();
-    _fadeController.dispose();
+    _entryController.dispose();
     super.dispose();
   }
 
@@ -91,354 +79,355 @@ class _CompareScreenState extends State<CompareScreen>
       });
       return;
     }
-
     setState(() {
       _isLoading = true;
       _error = null;
     });
-
     try {
       final List<Property> loaded = [];
       for (final id in ids) {
-        final p = await ApiService.getPropertyById(id);
-        loaded.add(p);
+        loaded.add(await ApiService.getPropertyById(id));
       }
       setState(() {
         _properties = loaded;
         _isLoading = false;
       });
-      if (loaded.length == 2) {
-        _slideController.forward(from: 0);
-        _fadeController.forward(from: 0);
-      }
-    } catch (e) {
+      if (loaded.length == 2) _entryController.forward(from: 0);
+    } catch (_) {
       setState(() {
-        _error = 'Failed to load one or more properties. Try again.';
+        _error = 'Could not load properties.';
         _isLoading = false;
-        _properties = [];
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: _buildBody(),
-      floatingActionButton:
-          _properties.length == 2 ? _buildFloatingActions() : null,
+      backgroundColor: cs.surface,
+      body: Column(
+        children: [
+          _buildAppBar(cs),
+          Expanded(
+            child: _isLoading
+                ? _buildLoading(cs)
+                : _error != null
+                    ? _buildError(cs)
+                    : _properties.length != 2
+                        ? _buildEmptyState(cs)
+                        : _buildComparePage(cs),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) return _buildLoadingState();
-    if (_error != null) return _buildErrorState();
-    if (_properties.length != 2) return _buildEmptyState();
-    return _buildCompareContent();
-  }
+  // ─── Loading ───────────────────────────────────────────────────────────────
+  Widget _buildLoading(ColorScheme cs) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: cs.primary),
+            ),
+            const SizedBox(height: 20),
+            Text('Loading…',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
+          ],
+        ),
+      );
 
-  // ─── Loading ──────────────────────────────────────────────────────────────
-  Widget _buildLoadingState() {
-    return Center(
+  // ─── Error ─────────────────────────────────────────────────────────────────
+  Widget _buildError(ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.all(32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(
-            valueColor:
-                AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
-          ),
+          Icon(Icons.wifi_off_rounded, size: 48, color: cs.error),
+          const SizedBox(height: 16),
+          Text(_error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: cs.onSurfaceVariant)),
           const SizedBox(height: 24),
-          Text('Loading Properties...',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w500)),
+          TextButton(
+            onPressed: () {
+              Provider.of<CompareProvider>(context, listen: false)
+                  .clearCompare();
+              setState(() {
+                _error = null;
+                _lastCompareIds = [];
+              });
+            },
+            child: const Text('Clear & Retry'),
+          ),
         ],
       ),
     );
   }
 
-  // ─── Error ────────────────────────────────────────────────────────────────
-  Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline,
-                size: 64,
-                color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 24),
-            Text('Something went wrong',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Text(_error!,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () {
-                Provider.of<CompareProvider>(context, listen: false)
-                    .clearCompare();
-                setState(() {
-                  _error = null;
-                  _properties = [];
-                  _lastCompareIds = [];
-                });
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Clear & Retry'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─── Empty State ──────────────────────────────────────────────────────────
-  Widget _buildEmptyState() {
+  // ─── Empty State ───────────────────────────────────────────────────────────
+  Widget _buildEmptyState(ColorScheme cs) {
+    final tt = Theme.of(context).textTheme;
     final count = _lastCompareIds.length;
-    final needMore = 2 - count;
+    final need = 2 - count;
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.balance,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary),
-            ),
-            const SizedBox(height: 32),
-            Text(
-              count == 0 ? 'Compare Properties' : 'Almost There!',
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            // Show progress pills
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _selectionPill(1, count >= 1),
-                const SizedBox(width: 8),
-                _selectionPill(2, count >= 2),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              count == 0
-                  ? 'Tap the ⚖️ icon on any property card to add it to your comparison.'
-                  : 'Select $needMore more propert${needMore == 1 ? "y" : "ies"} to unlock the comparison.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 32),
-            if (count > 0)
-              OutlinedButton.icon(
-                onPressed: () {
-                  Provider.of<CompareProvider>(context, listen: false)
-                      .clearCompare();
-                },
-                icon: const Icon(Icons.clear),
-                label: const Text('Clear Selection'),
-              ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () {
-                // Go to Home tab via callback, or pop if navigated here directly
-                if (widget.onGoHome != null) {
-                  widget.onGoHome!();
-                } else {
-                  Navigator.of(context).maybePop();
-                }
-              },
-              icon: const Icon(Icons.search),
-              label: const Text('Browse Properties'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Elegant icon pair
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _propertySlot(cs, count >= 1, '1'),
+              const SizedBox(width: 16),
+              Icon(Icons.compare_arrows_rounded,
+                  color: cs.primary.withOpacity(0.5), size: 28),
+              const SizedBox(width: 16),
+              _propertySlot(cs, count >= 2, '2'),
+            ],
+          ),
+          const SizedBox(height: 36),
+          Text(
+            count == 0 ? 'Compare Properties' : 'One More to Go',
+            style: tt.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            count == 0
+                ? 'Tap the ⚖ icon on any property card to add it to your compare list.'
+                : 'Add $need more propert${need == 1 ? 'y' : 'ies'} to start comparing.',
+            style: tt.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant, height: 1.6),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 36),
+          if (count > 0) ...[
+            OutlinedButton.icon(
+              onPressed: () => Provider.of<CompareProvider>(context,
+                      listen: false)
+                  .clearCompare(),
+              icon: const Icon(Icons.clear_rounded, size: 16),
+              label: const Text('Clear Selection'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30)),
+                    borderRadius: BorderRadius.circular(12)),
               ),
             ),
+            const SizedBox(height: 12),
           ],
-        ),
+          FilledButton.icon(
+            onPressed: () {
+              if (widget.onGoHome != null) {
+                widget.onGoHome!();
+              } else {
+                Navigator.of(context).maybePop();
+              }
+            },
+            icon: const Icon(Icons.search_rounded, size: 18),
+            label: const Text('Browse Properties'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 28, vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _selectionPill(int number, bool filled) {
-    final color = Theme.of(context).colorScheme.primary;
+  Widget _propertySlot(ColorScheme cs, bool filled, String num) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: 48,
-      height: 48,
+      width: 56,
+      height: 56,
       decoration: BoxDecoration(
-        color: filled ? color : color.withOpacity(0.15),
+        color: filled ? cs.primary : Colors.transparent,
         shape: BoxShape.circle,
-        border: Border.all(color: color, width: 2),
+        border: Border.all(
+          color: filled ? cs.primary : cs.outline.withOpacity(0.4),
+          width: 1.5,
+        ),
       ),
       child: Center(
         child: filled
-            ? const Icon(Icons.check, color: Colors.white, size: 20)
-            : Text('$number',
+            ? Icon(Icons.check_rounded, color: cs.onPrimary, size: 22)
+            : Text(num,
                 style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16)),
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18)),
       ),
     );
   }
 
-  // ─── Compare Content ──────────────────────────────────────────────────────
-  Widget _buildCompareContent() {
+  // ─── Compare Page ──────────────────────────────────────────────────────────
+  Widget _buildComparePage(ColorScheme cs) {
     return Column(
       children: [
-        _buildCustomAppBar(),
-        _buildTabBar(),
+        _buildTabBar(cs),
         Expanded(
-          child: _selectedTab == 0 ? _buildOverviewTab() : _buildDetailedTab(),
+          child: FadeTransition(
+            opacity: _fadeAnim,
+            child: SlideTransition(
+              position: _slideAnim,
+              child: _selectedTab == 0
+                  ? _buildOverview(cs)
+                  : _buildDetails(cs),
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildCustomAppBar() {
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 16,
-        left: 16,
-        right: 16,
-        bottom: 16,
-      ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).shadowColor.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              icon: Icon(Icons.arrow_back,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              'Property Comparison',
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.errorContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              icon: Icon(Icons.clear_all,
-                  color: Theme.of(context).colorScheme.error),
-              onPressed: () {
-                Provider.of<CompareProvider>(context, listen: false)
-                    .clearCompare();
-              },
-              tooltip: 'Clear comparison',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildAppBar(ColorScheme cs) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final Color textColor = isDark ? Colors.white : const Color(0xFF101828);
+    final count = _lastCompareIds.length;
 
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          _tab(0, 'Overview'),
-          _tab(1, 'Details'),
-        ],
-      ),
-    );
-  }
-
-  Widget _tab(int index, String label) {
-    final active = _selectedTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+        child: Container(
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: active
-                ? Theme.of(context).colorScheme.primary
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: active
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? const <Color>[Color(0xFF101625), Color(0xFF111E18)]
+                  : const <Color>[Colors.white, Color(0xFFEFFDF5)],
             ),
+            border: Border.all(
+              color: isDark
+                  ? const Color(0xFF1E2D3B)
+                  : const Color(0xFFDCFCE7),
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withOpacity(
+                  isDark ? 0.22 : 0.06,
+                ),
+                blurRadius: 24,
+                offset: const Offset(0, 14),
+              ),
+            ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOverviewTab() {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
-              _buildPropertyCards(),
-              const SizedBox(height: 24),
-              _buildQuickComparison(),
-              const SizedBox(height: 24),
-              _buildWinnerCard(),
-              const SizedBox(height: 100),
+          child: Row(
+            children: <Widget>[
+              Material(
+                color: isDark
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFFF2F4F7),
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    if (widget.onGoHome != null) {
+                      widget.onGoHome!();
+                    } else {
+                      Navigator.maybePop(context);
+                    }
+                  },
+                  child: SizedBox(
+                    width: 46,
+                    height: 46,
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: textColor,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    colors: <Color>[Color(0xFF10B981), Color(0xFF059669)],
+                  ),
+                ),
+                child: const Icon(
+                  Icons.compare_arrows_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Compare',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: textColor,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      count == 0
+                          ? 'No properties'
+                          : count == 1
+                              ? '1 property added'
+                              : 'Comparing 2 properties',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: isDark ? Colors.grey[400] : Colors.grey[650],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (count > 0) ...[
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    Provider.of<CompareProvider>(context, listen: false)
+                        .clearCompare();
+                    setState(() {
+                      _error = null;
+                      _lastCompareIds = [];
+                    });
+                  },
+                  icon: const Icon(Icons.close_rounded, size: 16, color: Colors.red),
+                  label: const Text(
+                    'Clear',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -446,55 +435,350 @@ class _CompareScreenState extends State<CompareScreen>
     );
   }
 
-  Widget _buildDetailedTab() {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+  Widget _buildTabBar(ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Row(
+        children: [
+          _tab(0, 'Overview', cs),
+          const SizedBox(width: 8),
+          _tab(1, 'Details', cs),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(int index, String label, ColorScheme cs) {
+    final active = _selectedTab == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTab = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+        decoration: BoxDecoration(
+          color: active ? cs.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: active
+                ? cs.primary
+                : cs.outline.withOpacity(0.3),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? cs.onPrimary : cs.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Overview Tab ──────────────────────────────────────────────────────────
+  Widget _buildOverview(ColorScheme cs) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          _buildPropertyHeaderRow(cs),
+          const SizedBox(height: 24),
+          _buildMetricGrid(cs),
+          const SizedBox(height: 24),
+          _buildValueBadge(cs),
+          const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPropertyHeaderRow(ColorScheme cs) {
+    final tt = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Expanded(child: _miniPropertyCard(_properties[0], cs, tt, 0)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text('vs',
+              style: tt.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5)),
+        ),
+        Expanded(child: _miniPropertyCard(_properties[1], cs, tt, 1)),
+      ],
+    );
+  }
+
+  Widget _miniPropertyCard(
+      Property p, ColorScheme cs, TextTheme tt, int index) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PropertyDetailScreen(propertyId: p.id),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: cs.surfaceVariant.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: cs.outline.withOpacity(0.15)),
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
-            _buildPropertyCards(),
-            const SizedBox(height: 24),
-            _buildDetailedComparison(),
-            const SizedBox(height: 100),
+            // Thumbnail
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: p.images.isNotEmpty
+                    ? Image.network(p.images[0],
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: cs.primaryContainer,
+                          child: Icon(Icons.home,
+                              color: cs.primary, size: 24),
+                        ))
+                    : Container(
+                        color: cs.primaryContainer,
+                        child: Icon(Icons.home,
+                            color: cs.primary, size: 24)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              p.title,
+              style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _fmtPrice(p.price),
+              style: tt.bodyMedium?.copyWith(
+                  color: cs.primary, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPropertyCards() {
-    return SizedBox(
-      height: 240,
+  Widget _buildMetricGrid(ColorScheme cs) {
+    final tt = Theme.of(context).textTheme;
+    final p0 = _properties[0];
+    final p1 = _properties[1];
+
+    final metrics = [
+      _CompareMetric(
+        label: 'Price',
+        v0: _fmtPrice(p0.price),
+        v1: _fmtPrice(p1.price),
+        winner: p0.price < p1.price ? 0 : 1,
+        icon: Icons.attach_money_rounded,
+      ),
+      _CompareMetric(
+        label: 'Area',
+        v0: '${p0.size.totalArea.toStringAsFixed(0)} sq ft',
+        v1: '${p1.size.totalArea.toStringAsFixed(0)} sq ft',
+        winner: p0.size.totalArea > p1.size.totalArea ? 0 : 1,
+        icon: Icons.square_foot_rounded,
+      ),
+      _CompareMetric(
+        label: 'Bedrooms',
+        v0: '${p0.size.bedrooms ?? 0}',
+        v1: '${p1.size.bedrooms ?? 0}',
+        winner: (p0.size.bedrooms ?? 0) >= (p1.size.bedrooms ?? 0) ? 0 : 1,
+        icon: Icons.bed_rounded,
+      ),
+      _CompareMetric(
+        label: 'Bathrooms',
+        v0: '${p0.size.bathrooms ?? 0}',
+        v1: '${p1.size.bathrooms ?? 0}',
+        winner: (p0.size.bathrooms ?? 0) >= (p1.size.bathrooms ?? 0) ? 0 : 1,
+        icon: Icons.bathtub_outlined,
+      ),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outline.withOpacity(0.12)),
+      ),
+      child: Column(
+        children: [
+          // Header row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                const Expanded(
+                    flex: 2, child: SizedBox()),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    _properties[0].title,
+                    style: tt.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    _properties[1].title,
+                    style: tt.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.secondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          ...metrics.asMap().entries.map((e) {
+            final i = e.key;
+            final m = e.value;
+            return Column(
+              children: [
+                _metricRow(m, cs, tt),
+                if (i < metrics.length - 1)
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+              ],
+            );
+          }).toList(),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _metricRow(_CompareMetric m, ColorScheme cs, TextTheme tt) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: PropertyCard(propertyId: _properties[0].id),
+            flex: 2,
+            child: Row(
+              children: [
+                Icon(m.icon, size: 14, color: cs.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text(m.label,
+                    style: tt.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 11)),
+              ],
             ),
           ),
+          Expanded(
+            flex: 3,
+            child: _metricCell(m.v0, m.winner == 0, cs, tt, align: TextAlign.left),
+          ),
+          Expanded(
+            flex: 3,
+            child: _metricCell(m.v1, m.winner == 1, cs, tt, align: TextAlign.right),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metricCell(String value, bool isWinner, ColorScheme cs, TextTheme tt,
+      {required TextAlign align}) {
+    return Row(
+      mainAxisAlignment: align == TextAlign.right
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.start,
+      children: [
+        if (isWinner && align == TextAlign.left) ...[
+          Icon(Icons.arrow_upward_rounded,
+              size: 11, color: Colors.green.shade600),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          value,
+          style: tt.bodySmall?.copyWith(
+            fontWeight: isWinner ? FontWeight.w700 : FontWeight.w400,
+            color: isWinner ? cs.onSurface : cs.onSurfaceVariant,
+            fontSize: 13,
+          ),
+          textAlign: align,
+        ),
+        if (isWinner && align == TextAlign.right) ...[
+          const SizedBox(width: 4),
+          Icon(Icons.arrow_upward_rounded,
+              size: 11, color: Colors.green.shade600),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildValueBadge(ColorScheme cs) {
+    final tt = Theme.of(context).textTheme;
+    final p0 = _properties[0];
+    final p1 = _properties[1];
+    final ppsf0 = p0.size.totalArea > 0
+        ? p0.price / p0.size.totalArea
+        : double.infinity;
+    final ppsf1 = p1.size.totalArea > 0
+        ? p1.price / p1.size.totalArea
+        : double.infinity;
+    final winner = ppsf0 <= ppsf1 ? p0 : p1;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cs.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outline.withOpacity(0.12)),
+      ),
+      child: Row(
+        children: [
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
+              color: Colors.amber.shade100,
               shape: BoxShape.circle,
             ),
-            child: Text(
-              'VS',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
+            child: Icon(Icons.emoji_events_rounded,
+                color: Colors.amber.shade700, size: 22),
           ),
+          const SizedBox(width: 16),
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: PropertyCard(propertyId: _properties[1].id),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Best Value',
+                    style: tt.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5)),
+                const SizedBox(height: 3),
+                Text(winner.title,
+                    style: tt.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(
+                  '${_fmtPrice(ppsf0 <= ppsf1 ? ppsf0 : ppsf1)} / sq ft',
+                  style: tt.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
             ),
           ),
         ],
@@ -502,287 +786,181 @@ class _CompareScreenState extends State<CompareScreen>
     );
   }
 
-  Widget _buildQuickComparison() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Quick Comparison',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          _buildComparisonRow('Price',
-              'UGX ${_formatPrice(_properties[0].price)}',
-              'UGX ${_formatPrice(_properties[1].price)}',
-              _properties[0].price < _properties[1].price ? 0 : 1),
-          _buildComparisonRow('Area',
-              '${_properties[0].size.totalArea.toStringAsFixed(0)} sq ft',
-              '${_properties[1].size.totalArea.toStringAsFixed(0)} sq ft',
-              _properties[0].size.totalArea > _properties[1].size.totalArea
-                  ? 0
-                  : 1),
-          _buildComparisonRow('Bedrooms',
-              '${_properties[0].size.bedrooms ?? 0}',
-              '${_properties[1].size.bedrooms ?? 0}',
-              (_properties[0].size.bedrooms ?? 0) >
-                      (_properties[1].size.bedrooms ?? 0)
-                  ? 0
-                  : 1),
-          _buildComparisonRow('Bathrooms',
-              '${_properties[0].size.bathrooms ?? 0}',
-              '${_properties[1].size.bathrooms ?? 0}',
-              (_properties[0].size.bathrooms ?? 0) >
-                      (_properties[1].size.bathrooms ?? 0)
-                  ? 0
-                  : 1),
-        ],
-      ),
-    );
-  }
+  // ─── Details Tab ───────────────────────────────────────────────────────────
+  Widget _buildDetails(ColorScheme cs) {
+    final p0 = _properties[0];
+    final p1 = _properties[1];
+    final tt = Theme.of(context).textTheme;
 
-  Widget _buildComparisonRow(
-      String label, String v1, String v2, int winner) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(label,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(fontWeight: FontWeight.w600)),
-          ),
-          Expanded(child: _comparisonCell(v1, winner == 0)),
-          const SizedBox(width: 8),
-          Expanded(child: _comparisonCell(v2, winner == 1)),
-        ],
-      ),
-    );
-  }
-
-  Widget _comparisonCell(String value, bool isWinner) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: isWinner
-            ? Theme.of(context).colorScheme.primaryContainer
-            : Theme.of(context).colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isWinner
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.outline.withOpacity(0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          if (isWinner) ...[
-            Icon(Icons.star,
-                size: 12, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 4),
+    final sections = [
+      _DetailSection('Location', [p0.location, p1.location],
+          Icons.location_on_outlined),
+      _DetailSection(
+          'Type',
+          [
+            p0.type.toString().split('.').last,
+            p1.type.toString().split('.').last
           ],
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontWeight: isWinner ? FontWeight.bold : FontWeight.normal,
-                color: isWinner
-                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
+          Icons.home_outlined),
+      _DetailSection(
+          'Purpose',
+          [
+            p0.purpose.toString().split('.').last,
+            p1.purpose.toString().split('.').last
+          ],
+          Icons.sell_outlined),
+      _DetailSection(
+          'Size',
+          [
+            '${p0.size.totalArea.toStringAsFixed(0)} sq ft',
+            '${p1.size.totalArea.toStringAsFixed(0)} sq ft'
+          ],
+          Icons.square_foot_rounded),
+      _DetailSection(
+          'Bedrooms',
+          ['${p0.size.bedrooms ?? 0}', '${p1.size.bedrooms ?? 0}'],
+          Icons.bed_outlined),
+      _DetailSection(
+          'Bathrooms',
+          ['${p0.size.bathrooms ?? 0}', '${p1.size.bathrooms ?? 0}'],
+          Icons.bathtub_outlined),
+      _DetailSection(
+          'Price',
+          [_fmtPrice(p0.price), _fmtPrice(p1.price)],
+          Icons.attach_money_rounded),
+      _DetailSection(
+          'Amenities',
+          [p0.amenities.join(', '), p1.amenities.join(', ')],
+          Icons.stars_outlined),
+    ];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          // Column headers
+          Row(
+            children: [
+              const Expanded(flex: 2, child: SizedBox()),
+              Expanded(
+                flex: 3,
+                child: Text(p0.title,
+                    style: tt.labelSmall?.copyWith(
+                        color: cs.primary, fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 3,
+                child: Text(p1.title,
+                    style: tt.labelSmall?.copyWith(
+                        color: cs.secondary, fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(18),
+              border:
+                  Border.all(color: cs.outline.withOpacity(0.12)),
+            ),
+            child: Column(
+              children: sections.asMap().entries.map((e) {
+                final i = e.key;
+                final s = e.value;
+                return Column(
+                  children: [
+                    _detailSectionRow(s, cs, tt),
+                    if (i < sections.length - 1)
+                      const Divider(
+                          height: 1, indent: 16, endIndent: 16),
+                  ],
+                );
+              }).toList(),
             ),
           ),
+          const SizedBox(height: 80),
         ],
       ),
     );
   }
 
-  Widget _buildWinnerCard() {
-    final p0ppsf = _properties[0].price / _properties[0].size.totalArea;
-    final p1ppsf = _properties[1].price / _properties[1].size.totalArea;
-    final winnerIndex = p0ppsf < p1ppsf ? 0 : 1;
-    final winner = _properties[winnerIndex];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: Theme.of(context).colorScheme.tertiary.withOpacity(0.4)),
-      ),
-      child: Column(
-        children: [
-          Icon(Icons.emoji_events,
-              color: Theme.of(context).colorScheme.tertiary, size: 40),
-          const SizedBox(height: 8),
-          Text('Best Value',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color:
-                      Theme.of(context).colorScheme.onTertiaryContainer)),
-          const SizedBox(height: 4),
-          Text(winner.title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color:
-                      Theme.of(context).colorScheme.onTertiaryContainer)),
-          const SizedBox(height: 4),
-          Text(
-            '${(winnerIndex == 0 ? p0ppsf : p1ppsf).toStringAsFixed(0)} UGX/sq ft',
-            style: TextStyle(
-                color: Theme.of(context).colorScheme.tertiary,
-                fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailedComparison() {
-    return Column(
-      children: [
-        _detailSection('Price',
-            ['UGX ${_formatPrice(_properties[0].price)}', 'UGX ${_formatPrice(_properties[1].price)}'],
-            Icons.attach_money),
-        _detailSection('Location',
-            [_properties[0].location, _properties[1].location],
-            Icons.location_on),
-        _detailSection('Type', [
-          _properties[0].type.toString().split('.').last,
-          _properties[1].type.toString().split('.').last
-        ], Icons.home),
-        _detailSection('Purpose', [
-          _properties[0].purpose.toString().split('.').last,
-          _properties[1].purpose.toString().split('.').last
-        ], Icons.business),
-        _detailSection('Size', [
-          '${_properties[0].size.totalArea.toStringAsFixed(0)} sq ft',
-          '${_properties[1].size.totalArea.toStringAsFixed(0)} sq ft'
-        ], Icons.square_foot),
-        _detailSection('Bedrooms', [
-          '${_properties[0].size.bedrooms ?? 0}',
-          '${_properties[1].size.bedrooms ?? 0}'
-        ], Icons.bed),
-        _detailSection('Bathrooms', [
-          '${_properties[0].size.bathrooms ?? 0}',
-          '${_properties[1].size.bathrooms ?? 0}'
-        ], Icons.bathtub),
-        _detailSection('Amenities', [
-          _properties[0].amenities.join(', '),
-          _properties[1].amenities.join(', ')
-        ], Icons.star),
-      ],
-    );
-  }
-
-  Widget _detailSection(String title, List<String> values, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-              color: Theme.of(context).shadowColor.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
+  Widget _detailSectionRow(
+      _DetailSection s, ColorScheme cs, TextTheme tt) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: Theme.of(context).colorScheme.primary, size: 18),
-              const SizedBox(width: 8),
-              Text(title,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-            ],
+          Expanded(
+            flex: 2,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(s.icon, size: 14, color: cs.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text(s.label,
+                    style: tt.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 11)),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: _detailCell(values[0])),
-              const SizedBox(width: 12),
-              Expanded(child: _detailCell(values[1])),
-            ],
+          Expanded(
+            flex: 3,
+            child: Text(s.values[0],
+                style: tt.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600, fontSize: 12)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 3,
+            child: Text(s.values[1],
+                style: tt.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: cs.secondary),
+                textAlign: TextAlign.right),
           ),
         ],
       ),
     );
   }
 
-  Widget _detailCell(String value) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(value,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant)),
-    );
+  String _fmtPrice(double price) {
+    return context.read<SettingsProvider>().formatPrice(price, compact: true);
   }
+}
 
-  Widget _buildFloatingActions() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FloatingActionButton(
-          heroTag: 'compare_share',
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Share comparison link copied!')),
-            );
-          },
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-          child: const Icon(Icons.share),
-        ),
-        const SizedBox(height: 16),
-        FloatingActionButton(
-          heroTag: 'compare_clear',
-          onPressed: () {
-            Provider.of<CompareProvider>(context, listen: false).clearCompare();
-          },
-          backgroundColor: Theme.of(context).colorScheme.errorContainer,
-          foregroundColor: Theme.of(context).colorScheme.error,
-          child: const Icon(Icons.compare_arrows),
-        ),
-      ],
-    );
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// Data models for compare rows
+// ─────────────────────────────────────────────────────────────────────────────
+class _CompareMetric {
+  final String label;
+  final String v0;
+  final String v1;
+  final int winner;
+  final IconData icon;
+  const _CompareMetric({
+    required this.label,
+    required this.v0,
+    required this.v1,
+    required this.winner,
+    required this.icon,
+  });
+}
 
-  String _formatPrice(double price) {
-    if (price >= 1000000000) return '${(price / 1000000000).toStringAsFixed(1)}B';
-    if (price >= 1000000) return '${(price / 1000000).toStringAsFixed(1)}M';
-    if (price >= 1000) return '${(price / 1000).toStringAsFixed(0)}K';
-    return price.toStringAsFixed(0);
-  }
+class _DetailSection {
+  final String label;
+  final List<String> values;
+  final IconData icon;
+  const _DetailSection(this.label, this.values, this.icon);
 }

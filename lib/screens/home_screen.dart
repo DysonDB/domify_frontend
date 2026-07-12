@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../models/property_model.dart';
+import '../providers/settings_provider.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/property_card.dart';
 import 'filter_screen.dart';
 import 'explore_screen.dart';
@@ -10,7 +13,6 @@ import 'favorites_screen.dart';
 import 'settings_screen.dart';
 import 'all_properties_screen.dart';
 import 'loading_screen.dart';
-import 'ai_chat_screen.dart';
 
 /// Maps display category name → PropertyType enum name
 const Map<String, String> _categoryTypeMap = {
@@ -108,12 +110,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<void> _loadProperties() async {
+  Future<void> _loadProperties({bool forceRefresh = false}) async {
     try {
       final results = await Future.wait([
-        ApiService.getFeaturedProperties(),
-        ApiService.getRecentProperties(),
-        ApiService.getAllProperties(),
+        ApiService.getFeaturedProperties(forceRefresh: forceRefresh),
+        ApiService.getRecentProperties(forceRefresh: forceRefresh),
+        ApiService.getAllProperties(forceRefresh: forceRefresh),
       ]);
 
       setState(() {
@@ -123,6 +125,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _isLoading = false;
       });
       _animationController.forward();
+
+      // Trigger simulated push alerts if settings are enabled
+      Future.delayed(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        final settings = context.read<SettingsProvider>();
+        if (settings.propertyUpdatesEnabled) {
+          NotificationService.showNotification(
+            id: 991,
+            title: 'New Property Alert! 🏠',
+            body: 'A beautiful 5-bedroom townhouse is now available in Munyonyo.',
+          );
+        }
+        if (settings.priceChangesEnabled) {
+          Future.delayed(const Duration(seconds: 5), () {
+            if (!mounted) return;
+            if (settings.priceChangesEnabled) {
+              NotificationService.showNotification(
+                id: 992,
+                title: 'Price Drop Alert! 📉',
+                body: 'Price drop: 2-bedroom executive apartment in Muyenga is now UGX 2,200,000/mo (was UGX 2,500,000).',
+              );
+            }
+          });
+        }
+      });
     } catch (e) {
       setState(() {
         _featuredProperties = [];
@@ -154,8 +181,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading ? const LoadingScreen() : _buildMainContent(),
-      floatingActionButton: _currentIndex == 0 ? _buildFloatingActionButton() : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      // floatingActionButton: _currentIndex == 0 ? _buildFloatingActionButton() : null,
+      // floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
@@ -178,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildHomeContent() {
     return RefreshIndicator(
-      onRefresh: _loadProperties,
+      onRefresh: () => _loadProperties(forceRefresh: true),
       color: Theme.of(context).colorScheme.primary,
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
@@ -400,70 +427,82 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildQuickActions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
         child: Row(
-          children: _quickActions.map((action) {
+          children: _quickActions.asMap().entries.map((entry) {
+            final action = entry.value;
+            final Color accent = action['color'] as Color;
+            final IconData icon = action['icon'] as IconData;
+            final String label = action['label'] as String;
+
             return Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => _handleQuickAction(action['label'] as String),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .outline
-                              .withOpacity(0.1),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+              child: GestureDetector(
+                onTap: () => _handleQuickAction(label),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  margin: const EdgeInsets.symmetric(horizontal: 5),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    color: isDark
+                        ? accent.withOpacity(0.10)
+                        : accent.withOpacity(0.07),
+                    border: Border.all(
+                      color: accent.withOpacity(isDark ? 0.22 : 0.18),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withOpacity(0.10),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: action['color'].withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                action['icon'],
-                                color: action['color'],
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              action['label'],
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                letterSpacing: 0.2,
-                              ),
-                              textAlign: TextAlign.center,
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Gradient blob icon
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              accent,
+                              accent.withOpacity(0.65),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(13),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accent.withOpacity(0.35),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
+                        child: Icon(icon, color: Colors.white, size: 20),
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isDark
+                              ? accent.withOpacity(0.95)
+                              : accent.withOpacity(0.85),
+                          letterSpacing: 0.2,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -475,81 +514,98 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildCategoryFilter() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primary = Theme.of(context).colorScheme.primary;
     return SliverToBoxAdapter(
-      child: Container(
-        height: 56,
-        margin: const EdgeInsets.symmetric(vertical: 20),
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _categories.length,
-          itemBuilder: (context, index) {
-            final category = _categories[index];
-            final isSelected = _selectedCategory == category;
-            
-            return Container(
-              margin: const EdgeInsets.only(right: 10),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+            child: Row(
+              children: [
+                Text(
+                  'Browse by Type',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 40,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _categories.length,
+              itemBuilder: (context, index) {
+                final category = _categories[index];
+                final isSelected = _selectedCategory == category;
+                return GestureDetector(
                   onTap: () => setState(() => _selectedCategory = category),
-                  borderRadius: BorderRadius.circular(14),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
+                    curve: Curves.easeOut,
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 0),
                     decoration: BoxDecoration(
+                      gradient: isSelected
+                          ? LinearGradient(
+                              colors: [primary, primary.withOpacity(0.8)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
                       color: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context)
-                                .colorScheme
-                                .outline
-                                .withOpacity(0.2),
-                        width: 1.5,
-                      ),
+                          ? null
+                          : isDark
+                              ? Colors.white.withOpacity(0.07)
+                              : Colors.black.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(20),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary
-                                    .withOpacity(0.3),
+                                color: primary.withOpacity(0.3),
                                 blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
+                                offset: const Offset(0, 3),
+                              )
                             ]
                           : null,
                     ),
-                    child: Center(
-                      child: Text(
-                        category,
-                        style: TextStyle(
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.onPrimary
-                              : Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withOpacity(0.7),
-                          fontWeight:
-                              isSelected ? FontWeight.w700 : FontWeight.w600,
-                          fontSize: 14,
-                          letterSpacing: 0.3,
-                        ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      category,
+                      style: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.65),
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 13,
+                        letterSpacing: 0.1,
                       ),
                     ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -758,34 +814,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildFloatingActionButton() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const AIChatScreen()),
-        ),
-        icon: const Icon(Icons.forum_rounded),
-        label: const Text(
-          'AI Chat',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        elevation: 0,
-      ),
-    );
-  }
+  // Widget _buildFloatingActionButton() {
+  //   return Container(
+  //     decoration: BoxDecoration(
+  //       borderRadius: BorderRadius.circular(16),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+  //           blurRadius: 12,
+  //           offset: const Offset(0, 6),
+  //         ),
+  //       ],
+  //     ),
+  //     child: FloatingActionButton.extended(
+  //       onPressed: () => Navigator.push(
+  //         context,
+  //         MaterialPageRoute(builder: (context) => const AIChatScreen()),
+  //       ),
+  //       icon: const Icon(Icons.forum_rounded),
+  //       label: const Text(
+  //         'AI Chat',
+  //         style: TextStyle(fontWeight: FontWeight.w600),
+  //       ),
+  //       backgroundColor: Theme.of(context).colorScheme.primary,
+  //       foregroundColor: Theme.of(context).colorScheme.onPrimary,
+  //       elevation: 0,
+  //     ),
+  //   );
+  // }
 
   /// Per-tab accent colors — ordered by nav index
   static const _tabColors = [

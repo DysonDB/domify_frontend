@@ -6,12 +6,16 @@ import 'providers/theme_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/favorites_provider.dart';
 import 'providers/compare_provider.dart';
+import 'providers/history_provider.dart';
+import 'providers/appointments_provider.dart';
 
 import 'services/local_storage_service.dart';
+import 'services/notification_service.dart';
 import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
   final prefs = await SharedPreferences.getInstance();
   final storage = LocalStorageService(prefs);
   
@@ -23,7 +27,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
         ChangeNotifierProvider(create: (_) => CompareProvider(storage)),
-
+        ChangeNotifierProvider(create: (_) => HistoryProvider()),
+        ChangeNotifierProvider(create: (_) => AppointmentsProvider()),
       ],
       child: const MyApp(),
     ),

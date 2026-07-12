@@ -7,6 +7,7 @@ import '../models/property_model.dart';
 import '../services/api_service.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/compare_provider.dart';
+import '../providers/settings_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'property_detail_screen.dart';
 
@@ -634,7 +635,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'UGX ${_formatPrice(property.price)}',
+                  context.read<SettingsProvider>().formatPrice(property.price, compact: true),
                   style: const TextStyle(
                     color: Colors.black,
                     fontSize: 14,

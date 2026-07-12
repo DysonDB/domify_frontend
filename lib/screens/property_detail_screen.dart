@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/property_model.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/compare_provider.dart';
+import '../providers/history_provider.dart';
 import '../services/api_service.dart';
-import '../widgets/image_carousel.dart';
-import '../widgets/video_player_widget.dart';
-import '../widgets/location_map.dart';
-import '../widgets/property_tags.dart';
 import 'booking_screen.dart';
+import 'stay_booking_screen.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PREMIUM PROPERTY DETAIL SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
 class PropertyDetailScreen extends StatefulWidget {
   final String propertyId;
 
@@ -43,6 +46,20 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         _property = property;
         _isLoading = false;
       });
+      // Record this view in history
+      if (mounted) {
+        context.read<HistoryProvider>().recordView(
+          ViewedProperty(
+            id: property.id,
+            title: property.title,
+            location: property.location,
+            imageUrl: property.images.isNotEmpty ? property.images.first : '',
+            price: property.price,
+            purpose: property.purpose.toString().split('.').last,
+            viewedAt: DateTime.now(),
+          ),
+        );
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -51,129 +68,98 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     }
   }
 
+  IconData _getAmenityIcon(String amenity) {
+    final lower = amenity.toLowerCase();
+    if (lower.contains('wifi') || lower.contains('internet')) return Icons.wifi_rounded;
+    if (lower.contains('park')) return Icons.local_parking_rounded;
+    if (lower.contains('security') || lower.contains('guard')) return Icons.security_rounded;
+    if (lower.contains('ac') || lower.contains('air conditioning') || lower.contains('cooling')) {
+      return Icons.ac_unit_rounded;
+    }
+    if (lower.contains('pool') || lower.contains('swim')) return Icons.pool_rounded;
+    if (lower.contains('gym') || lower.contains('fitness')) return Icons.fitness_center_rounded;
+    if (lower.contains('kitchen')) return Icons.soup_kitchen_rounded;
+    if (lower.contains('tv') || lower.contains('cable')) return Icons.tv_rounded;
+    return Icons.check_circle_outline_rounded;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: cs.surface,
+        body: Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+        ),
       );
     }
 
     if (_error != null) {
       return Scaffold(
+        backgroundColor: cs.surface,
         appBar: AppBar(
-          title: const Text('Property Details'),
+          backgroundColor: cs.surface,
+          elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: Icon(Icons.arrow_back_rounded, color: cs.onSurface),
             onPressed: () => Navigator.pop(context),
           ),
+          title: const Text('Property Details'),
         ),
-        body: Center(child: Text(_error!)),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          ),
+        ),
       );
     }
 
     return Scaffold(
+      backgroundColor: cs.surface,
       body: CustomScrollView(
         slivers: [
-          // Image Carousel App Bar
+          // ── Premium Floating App Bar With Image Carousel ───────────────────
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: 330,
             pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Swipeable Image Carousel
-                  PageView.builder(
-                    itemCount: _property.images.length,
-                    onPageChanged: (index) {
-                      setState(() => _currentImageIndex = index);
-                    },
-                    itemBuilder: (context, index) {
-                      return Image.network(
-                        _property.images[index],
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.image, size: 50),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                  // Gradient Overlay
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.7),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Image Counter
-                  Positioned(
-                    bottom: 16,
-                    right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '${_currentImageIndex + 1}/${_property.images.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            backgroundColor: cs.surface,
+            elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: Colors.black26,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+              ),
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
-              // Favorite Button
-              Consumer<FavoritesProvider>(
-                builder: (context, favoritesProvider, child) {
-                  final isFavorite = favoritesProvider.isFavorite(_property.id);
-                  return IconButton(
-                    icon: Icon(
-                      isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: isFavorite ? Colors.red : null,
-                    ),
-                    onPressed: () {
-                      if (isFavorite) {
-                        favoritesProvider.removeFavorite(_property.id);
-                      } else {
-                        favoritesProvider.addFavorite(_property.id);
-                      }
-                    },
-                  );
-                },
-              ),
-              // Compare Button
+              // Compare
               Consumer<CompareProvider>(
                 builder: (context, compareProvider, child) {
                   final isInCompare = compareProvider.isInCompare(_property.id);
                   return IconButton(
-                    icon: Icon(
-                      isInCompare ? Icons.balance : Icons.balance_outlined,
-                      color: isInCompare
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Colors.black26,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isInCompare ? Icons.balance_rounded : Icons.balance_outlined,
+                        color: isInCompare ? cs.primary : Colors.white,
+                        size: 20,
+                      ),
                     ),
                     onPressed: () {
                       if (isInCompare) {
@@ -185,196 +171,335 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   );
                 },
               ),
-              // Share Button
+              // Share
               IconButton(
-                icon: const Icon(Icons.share),
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.black26,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
+                ),
                 onPressed: () {
-                  final link =
-                      'https://dnbhomes.app/property/${_property.id}';
-                  Clipboard.setData(ClipboardData(text: link));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Property link copied to clipboard')),
+                  final String shareText =
+                      '🏠 Check out this property on dnb Homes!\n\n'
+                      '${_property.title}\n'
+                      '📍 ${_property.location}\n'
+                      '💰 ${_property.price.toStringAsFixed(0)} UGX\n\n'
+                      'View it here: https://domify.nilebitlabs.com/property/${_property.id}';
+                  Share.share(
+                    shareText,
+                    subject: '${_property.title} — dnb Homes',
                   );
                 },
               ),
+              const SizedBox(width: 8),
             ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  PageView.builder(
+                    itemCount: _property.images.length,
+                    onPageChanged: (idx) => setState(() => _currentImageIndex = idx),
+                    itemBuilder: (context, index) {
+                      return Image.network(
+                        _property.images[index],
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: cs.secondaryContainer,
+                          child: Icon(Icons.image_outlined, size: 48, color: cs.secondary),
+                        ),
+                      );
+                    },
+                  ),
+                  // Bottom subtle gradient
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.2),
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.4),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Slide counter indicator
+                  Positioned(
+                    bottom: 24,
+                    right: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.55),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_currentImageIndex + 1}/${_property.images.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          // Property Details
+
+          // ── Detailed Content Sheet ─────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title and Price
+                  // Title & Price Section
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          _property.title,
-                          style:
-                              Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        ),
-                      ),
-                      Text(
-                        'UGX ${_property.price.toStringAsFixed(0)}',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.bold,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _property.title,
+                              style: tt.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                              ),
                             ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Location
-                  Row(
-                    children: [
-                      Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          _property.location,
-                          style: TextStyle(color: Colors.grey[600]),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Icon(Icons.location_on_rounded, size: 15, color: cs.onSurfaceVariant),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    _property.location,
+                                    style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'UGX',
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          Text(
+                            _fmtPrice(_property.price),
+                            style: tt.headlineSmall?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // Property Type and Purpose
+                  const SizedBox(height: 20),
+
+                  // Info Badges (Type & Purpose)
                   Row(
                     children: [
                       _buildInfoChip(
-                        icon: Icons.home,
+                        icon: Icons.home_outlined,
                         label: _property.type.toString().split('.').last,
                       ),
                       const SizedBox(width: 8),
                       _buildInfoChip(
-                        icon: Icons.sell,
+                        icon: Icons.sell_outlined,
                         label: _property.purpose.toString().split('.').last,
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
+
+                  const Divider(height: 1),
+                  const SizedBox(height: 24),
+
                   // Description
                   Text(
-                    'Description',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    'About this Property',
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.2,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _property.description,
-                    style: Theme.of(context).textTheme.bodyLarge,
+                    style: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      height: 1.6,
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                  // Amenities
+                  const SizedBox(height: 28),
+
+                  // Amenities list
                   Text(
-                    'Amenities',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    'Amenities Offered',
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.2,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: _property.amenities.map((amenity) {
-                      return Chip(
-                        label: Text(amenity),
-                        backgroundColor:
-                            Theme.of(context).colorScheme.primaryContainer,
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: cs.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: cs.outline.withOpacity(0.18)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getAmenityIcon(amenity),
+                              size: 16,
+                              color: cs.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              amenity,
+                              style: tt.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 24),
-                  // Contact Section
+                  const SizedBox(height: 36),
+
+                  // Premium Agent Card
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(12),
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: cs.outline.withOpacity(0.15)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: cs.shadow.withOpacity(0.03),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Contact Agent',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                          'Listing Agent',
+                          style: tt.labelLarge?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
                         Row(
                           children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundImage:
-                                  NetworkImage(_property.agent.photo),
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: cs.outline.withOpacity(0.2), width: 1.5),
+                                image: const DecorationImage(
+                                  image: AssetImage('assets/images/dnblogolight.jpg'),
+                                  fit: BoxFit.cover,
+                                  alignment: Alignment(0.18, 0.0), // Shift right to center the logo perfectly
+                                ),
+                              ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _property.agent.name,
-                                    style:
-                                        Theme.of(context).textTheme.titleMedium,
+                                    'dnb',
+                                    style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                                   ),
+                                  const SizedBox(height: 2),
                                   Text(
-                                    'Senior Agent',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(color: Colors.grey[600]),
+                                    'Official Listing Agent',
+                                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                   ),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         Row(
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: () async {
-                                  final uri = Uri(
-                                    scheme: 'tel',
-                                    path: _property.agent.phone,
-                                  );
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri);
-                                  }
+                                  final uri = Uri(scheme: 'tel', path: '0747877740');
+                                  if (await canLaunchUrl(uri)) await launchUrl(uri);
                                 },
-                                icon: const Icon(Icons.phone),
-                                label: const Text('Call'),
+                                icon: const Icon(Icons.phone_outlined, size: 18),
+                                label: const Text('Call Agent'),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: OutlinedButton.icon(
+                              child: ElevatedButton.icon(
                                 onPressed: () async {
-                                  final uri = Uri(
-                                    scheme: 'mailto',
-                                    path: _property.agent.email,
-                                    queryParameters: {
-                                      'subject':
-                                          'Inquiry about ${_property.title}',
-                                    },
-                                  );
+                                  final message = 'Hello dnb, I am interested in: ${_property.title}';
+                                  final uri = Uri.parse('https://wa.me/256747877740?text=${Uri.encodeComponent(message)}');
                                   if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri);
+                                    await launchUrl(uri, mode: LaunchMode.externalApplication);
                                   }
                                 },
-                                icon: const Icon(Icons.message),
-                                label: const Text('Message'),
+                                icon: SvgPicture.string(
+                                  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="white"><path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/></svg>',
+                                  width: 17,
+                                  height: 17,
+                                ),
+                                label: const Text('WhatsApp'),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: Colors.green.shade600,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
                               ),
                             ),
                           ],
@@ -388,30 +513,73 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: ElevatedButton.icon(
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                shape: const RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                builder: (_) => _buildMoreActionsSheet(),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          border: Border(top: BorderSide(color: cs.outline.withOpacity(0.12))),
+        ),
+        child: Row(
+          children: [
+            // Favorites shortcut
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outline.withOpacity(0.2)),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Consumer<FavoritesProvider>(
+                builder: (context, favoritesProvider, child) {
+                  final isFav = favoritesProvider.isFavorite(_property.id);
+                  return IconButton(
+                    icon: Icon(
+                      isFav ? Icons.favorite : Icons.favorite_border_rounded,
+                      color: isFav ? Colors.red.shade600 : cs.onSurfaceVariant,
+                    ),
+                    onPressed: () {
+                      if (isFav) {
+                        favoritesProvider.removeFavorite(_property.id);
+                      } else {
+                        favoritesProvider.addFavorite(_property.id);
+                      }
+                    },
+                  );
+                },
               ),
             ),
-            icon: const Icon(Icons.more_horiz),
-            label: const Text('More Actions',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ),
+            const SizedBox(width: 14),
+            // Primary Booking Action
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    ),
+                    builder: (_) => _buildMoreActionsSheet(),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: cs.primary,
+                  foregroundColor: cs.onPrimary,
+                  minimumSize: const Size.fromHeight(52),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.calendar_month_rounded, size: 20),
+                    SizedBox(width: 10),
+                    Text(
+                      'Book Property',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -419,46 +587,42 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   // ─── More Actions Bottom Sheet ────────────────────────────────────────────
   Widget _buildMoreActionsSheet() {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle
             Container(
               width: 40,
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: cs.outline.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             Text(
-              'More Actions',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              'Select Booking Type',
+              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const Divider(height: 24),
             // Schedule Viewing
             ListTile(
               leading: Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  color: cs.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.schedule,
-                    color: Theme.of(context).colorScheme.primary),
+                child: Icon(Icons.schedule_rounded, color: cs.primary),
               ),
               title: const Text('Schedule Viewing'),
               subtitle: const Text('Book an in-person viewing'),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -472,100 +636,72 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 );
               },
             ),
-            // Request More Info
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.info_outline,
-                    color: Theme.of(context).colorScheme.secondary),
-              ),
-              title: const Text('Request More Info'),
-              subtitle: const Text('Ask the agent a question'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () async {
-                final uri = Uri(
-                  scheme: 'mailto',
-                  path: _property.agent.email,
-                  queryParameters: {
-                    'subject': 'Inquiry about ${_property.title}',
-                    'body':
-                        'Hello, I am interested in the property: ${_property.title} (ID: ${_property.id}). Could you provide more information?',
-                  },
-                );
-                Navigator.pop(context);
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Contact: ${_property.agent.email}')),
-                  );
-                }
-              },
-            ),
+            const Divider(height: 1, indent: 64),
             // Book Your Stay
             ListTile(
               leading: Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.orange.shade50,
+                  shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.hotel, color: Colors.orange),
+                child: Icon(Icons.hotel_rounded, color: Colors.orange.shade700),
               ),
               title: const Text('Book Your Stay'),
               subtitle: const Text('Reserve this property now'),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => BookingScreen(
-                      property: _property,
-                      bookingType: BookingType.stay,
-                    ),
+                    builder: (_) => StayBookingScreen(property: _property),
                   ),
                 );
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  // ─── Info Chip ────────────────────────────────────────────────────────────
+  // ─── Premium Info Chip Helper ─────────────────────────────────────────────
   Widget _buildInfoChip({
     required IconData icon,
     required String label,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(20),
+        color: cs.primary.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.primary.withOpacity(0.15)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 4),
+          Icon(icon, size: 16, color: cs.primary),
+          const SizedBox(width: 6),
           Text(
-            label,
+            label.toUpperCase(),
             style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
+              color: cs.primary,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              letterSpacing: 0.8,
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _fmtPrice(double price) {
+    if (price >= 1000000) return '${(price / 1000000).toStringAsFixed(0)}M';
+    if (price >= 1000) return '${(price / 1000).toStringAsFixed(0)}K';
+    return price.toStringAsFixed(0);
   }
 }

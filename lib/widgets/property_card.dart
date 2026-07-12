@@ -4,6 +4,7 @@ import 'package:shimmer/shimmer.dart';
 import '../models/property_model.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/compare_provider.dart';
+import '../providers/settings_provider.dart';
 import 'image_carousel.dart';
 import '../services/api_service.dart';
 import '../screens/property_detail_screen.dart';
@@ -196,7 +197,9 @@ class _PropertyCardState extends State<PropertyCard> {
                           ],
                         ),
                         Text(
-                          'UGX ${_formatPrice(_property!.price)}',
+                          context.select<SettingsProvider, String>(
+                            (s) => s.formatPrice(_property!.price, compact: true),
+                          ),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,

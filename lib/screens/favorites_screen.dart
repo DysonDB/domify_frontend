@@ -232,181 +232,135 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   }
 
   Widget _buildAnimatedAppBar(BuildContext context, FavoritesProvider favoritesProvider, ThemeData theme, bool isDark) {
-    return SliverAppBar(
-      expandedHeight: 220,
-      floating: false,
-      pinned: true,
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-      flexibleSpace: FlexibleSpaceBar(
-        background: AnimatedBuilder(
-          animation: _headerAnimation,
-          builder: (context, child) {
-            return Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark 
-                    ? [
-                        theme.primaryColor.withOpacity(0.8),
-                        theme.primaryColorDark,
-                        Colors.black87,
-                      ]
-                    : [
-                        theme.primaryColor.withOpacity(0.7),
-                        theme.primaryColorDark,
-                        theme.primaryColor.withOpacity(0.9),
-                      ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.primaryColor.withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  // Animated background pattern
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: _headerAnimation,
-                      builder: (context, child) {
-                        return CustomPaint(
-                          painter: _BackgroundPatternPainter(
-                            progress: _headerAnimation.value,
-                            color: Colors.white.withOpacity(0.1),
-                          ),
-                        );
-                      },
+    return SliverToBoxAdapter(
+      child: AnimatedBuilder(
+        animation: _headerAnimation,
+        builder: (context, child) {
+          final Color textColor = theme.brightness == Brightness.dark
+              ? Colors.white
+              : const Color(0xFF101828);
+
+          return Transform.translate(
+            offset: Offset(0, -30 * (1 - _headerAnimation.value)),
+            child: Opacity(
+              opacity: _headerAnimation.value.clamp(0.0, 1.0),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDark
+                          ? const <Color>[Color(0xFF1F1115), Color(0xFF101827)]
+                          : const <Color>[Colors.white, Color(0xFFFFF5F5)],
                     ),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF3B1E22)
+                          : const Color(0xFFFEE4E2),
+                    ),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: Colors.black.withOpacity(
+                          isDark ? 0.22 : 0.06,
+                        ),
+                        blurRadius: 24,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
                   ),
-                  // Content
-                  Transform.translate(
-                    offset: Offset(0, 50 * (1 - _headerAnimation.value)),
-                    child: Opacity(
-                      opacity: _headerAnimation.value.clamp(0.0, 1.0),
-                      child: SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Row(
-                                children: [
-                                   Container(
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.3),
-                                          width: 2,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.1),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.favorite_rounded,
-                                        color: Colors.white,
-                                        size: 32,
-                                      ),
-                                    ),
-                                  const SizedBox(width: 20),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'My Favorites',
-                                          style: theme.textTheme.headlineMedium?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: -0.5,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          child: Text(
-                                            '${favoritesProvider.favorites.length} ${favoritesProvider.favorites.length == 1 ? 'property' : 'properties'}',
-                                            style: theme.textTheme.bodyMedium?.copyWith(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (favoritesProvider.favorites.isNotEmpty)
-                                    _buildClearAllButton(context, favoritesProvider, theme),
-                                ],
-                              ),
-                            ],
+                  child: Row(
+                    children: <Widget>[
+                      Material(
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFF2F4F7),
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.maybePop(context),
+                          child: SizedBox(
+                            width: 46,
+                            height: 46,
+                            child: Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: textColor,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildClearAllButton(BuildContext context, FavoritesProvider favoritesProvider, ThemeData theme) {
-    return AnimatedBuilder(
-      animation: _headerAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _headerAnimation.value,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.3),
-                width: 2,
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => _showClearAllDialog(context, favoritesProvider, theme),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Icon(
-                    Icons.clear_all_rounded,
-                    color: Colors.white,
-                    size: 24,
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: const LinearGradient(
+                            colors: <Color>[Color(0xFFD9383A), Color(0xFFF05252)],
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.favorite_rounded,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Favorites',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: textColor,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${favoritesProvider.favorites.length} saved houses',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: isDark ? Colors.grey[400] : Colors.grey[650],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (favoritesProvider.favorites.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: () => _showClearAllDialog(context, favoritesProvider, theme),
+                          icon: const Icon(Icons.delete_sweep_rounded, size: 18, color: Color(0xFFD9383A)),
+                          label: const Text(
+                            'Clear',
+                            style: TextStyle(
+                              color: Color(0xFFD9383A),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
