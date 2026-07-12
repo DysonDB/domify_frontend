@@ -194,7 +194,7 @@ class _AccountSection extends StatelessWidget {
             _SettingsDivider(),
             _SettingsActionTile(
               icon: Icons.calendar_today_outlined,
-              title: settings.translate('appointments'),
+              title: 'Bookings',
               subtitle: 'Manage your property viewing bookings',
               onTap: () => _push(context, const AppointmentsScreen()),
             ),

@@ -208,8 +208,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           _buildHomeContent(),
           const ExploreScreen(),
-          const FavoritesScreen(),
-          const AppointmentsScreen(showBackButton: false),
+          FavoritesScreen(onBack: () => setState(() => _currentIndex = 0)),
+          AppointmentsScreen(onBack: () => setState(() => _currentIndex = 0)),
         ],
       ),
     );

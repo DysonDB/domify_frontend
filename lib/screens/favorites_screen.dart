@@ -7,7 +7,9 @@ import '../services/api_service.dart';
 import '../widgets/property_card.dart';
 
 class FavoritesScreen extends StatefulWidget {
-  const FavoritesScreen({super.key});
+  final VoidCallback? onBack;
+
+  const FavoritesScreen({super.key, this.onBack});
 
   @override
   State<FavoritesScreen> createState() => _FavoritesScreenState();
@@ -281,7 +283,8 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                         borderRadius: BorderRadius.circular(16),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(16),
-                          onTap: () => Navigator.maybePop(context),
+                          onTap: widget.onBack ??
+                              () => Navigator.of(context).maybePop(),
                           child: SizedBox(
                             width: 46,
                             height: 46,

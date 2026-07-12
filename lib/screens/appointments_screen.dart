@@ -1,17 +1,18 @@
-// 📁 lib/screens/appointments_screen.dart — real appointments management
+// 📁 lib/screens/appointments_screen.dart — bookings management
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/appointments_provider.dart';
-import '../widgets/legal_page_widgets.dart';
 import 'property_detail_screen.dart';
 
 class AppointmentsScreen extends StatefulWidget {
   final bool showBackButton;
+  final VoidCallback? onBack;
 
   const AppointmentsScreen({
     super.key,
     this.showBackButton = true,
+    this.onBack,
   });
 
   @override
@@ -38,98 +39,61 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final primary = const Color(0xFF178F5B);
-    final navy = const Color(0xFF1A3C6E);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B111E) : const Color(0xFFF6F8F7),
+      backgroundColor:
+          isDark ? const Color(0xFF0B111E) : const Color(0xFFF6F8F7),
       body: Consumer<AppointmentsProvider>(
         builder: (context, aProvider, _) {
-          return NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) => [
-              SliverAppBar(
-                expandedHeight: 170,
-                pinned: true,
-                forceElevated: innerBoxIsScrolled,
-                backgroundColor: isDark ? const Color(0xFF0B111E) : Colors.white,
-                automaticallyImplyLeading: widget.showBackButton,
-                leading: widget.showBackButton ? const LegalBackButton() : null,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [primary, navy],
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 55, 24, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text(
-                              'Appointments',
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                  color: Colors.white, fontWeight: FontWeight.w800),
+          return SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                _BookingsHeader(
+                  showBackButton: widget.showBackButton,
+                  onBack: widget.onBack,
+                  upcomingCount: aProvider.upcoming.length,
+                  pastCount: aProvider.past.length,
+                ),
+                _BookingsTabs(controller: _tabCtrl),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabCtrl,
+                    children: [
+                      _ApptList(
+                        appointments: aProvider.upcoming,
+                        emptyTitle: 'No upcoming bookings',
+                        emptySubtitle:
+                            'Book a viewing and it will appear here.',
+                        isDark: isDark,
+                        onCancel: (id) =>
+                            _confirmCancel(context, aProvider, id),
+                        onTap: (appt) => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PropertyDetailScreen(
+                              propertyId: appt.propertyId,
                             ),
-                            Text(
-                              '${aProvider.upcoming.length} upcoming · ${aProvider.past.length} past',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white.withOpacity(0.75)),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                bottom: TabBar(
-                  controller: _tabCtrl,
-                  indicatorColor: Colors.white,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white60,
-                  labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 14),
-                  tabs: const [
-                    Tab(text: 'Upcoming'),
-                    Tab(text: 'Past'),
-                  ],
-                ),
-              ),
-            ],
-            body: TabBarView(
-              controller: _tabCtrl,
-              children: [
-                _ApptList(
-                  appointments: aProvider.upcoming,
-                  emptyTitle: 'No upcoming appointments',
-                  emptySubtitle:
-                      'Book a property viewing to see appointments here.',
-                  isDark: isDark,
-                  onCancel: (id) => _confirmCancel(context, aProvider, id),
-                  onTap: (appt) => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          PropertyDetailScreen(propertyId: appt.propertyId),
-                    ),
-                  ),
-                ),
-                _ApptList(
-                  appointments: aProvider.past,
-                  emptyTitle: 'No past appointments',
-                  emptySubtitle: 'Completed and cancelled appointments will appear here.',
-                  isDark: isDark,
-                  onDelete: (id) => aProvider.removeAppointment(id),
-                  onTap: (appt) => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          PropertyDetailScreen(propertyId: appt.propertyId),
-                    ),
+                      _ApptList(
+                        appointments: aProvider.past,
+                        emptyTitle: 'No past bookings',
+                        emptySubtitle:
+                            'Completed and cancelled bookings will appear here.',
+                        isDark: isDark,
+                        onDelete: (id) => aProvider.removeAppointment(id),
+                        onTap: (appt) => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PropertyDetailScreen(
+                              propertyId: appt.propertyId,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -145,21 +109,192 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (_) => AlertDialog(
-        title: const Text('Cancel Appointment?'),
+        title: const Text('Cancel booking?'),
         content: const Text(
-            'Are you sure you want to cancel this appointment? This cannot be undone.'),
+            'Are you sure you want to cancel this booking? This cannot be undone.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Keep it')),
           TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Cancel Appointment',
+              child: const Text('Cancel booking',
                   style: TextStyle(color: Colors.red))),
         ],
       ),
     );
     if (confirmed == true) await p.cancelAppointment(id);
+  }
+}
+
+class _BookingsHeader extends StatelessWidget {
+  const _BookingsHeader({
+    required this.showBackButton,
+    required this.onBack,
+    required this.upcomingCount,
+    required this.pastCount,
+  });
+
+  final bool showBackButton;
+  final VoidCallback? onBack;
+  final int upcomingCount;
+  final int pastCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF101828);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? const <Color>[Color(0xFF101625), Color(0xFF111E18)]
+                : const <Color>[Colors.white, Color(0xFFEFFDF5)],
+          ),
+          border: Border.all(
+            color: isDark ? const Color(0xFF1E2D3B) : const Color(0xFFDCFCE7),
+          ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.22 : 0.06),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Row(
+          children: <Widget>[
+            if (showBackButton) ...[
+              _HeaderIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                color: textColor,
+                onTap: onBack ?? () => Navigator.of(context).maybePop(),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: const LinearGradient(
+                  colors: <Color>[Color(0xFF178F5B), Color(0xFF1A3C6E)],
+                ),
+              ),
+              child: const Icon(
+                Icons.calendar_month_rounded,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Bookings',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$upcomingCount upcoming · $pastCount past',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: textColor.withOpacity(0.58),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF2F4F7),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Icon(icon, color: color, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+class _BookingsTabs extends StatelessWidget {
+  const _BookingsTabs({required this.controller});
+
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      height: 48,
+      margin: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131B2E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE4E7EC),
+        ),
+      ),
+      child: TabBar(
+        controller: controller,
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          color: theme.colorScheme.primary,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        labelColor: Colors.white,
+        unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.58),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+        unselectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        tabs: const <Widget>[
+          Tab(text: 'Upcoming'),
+          Tab(text: 'Past'),
+        ],
+      ),
+    );
   }
 }
 
@@ -186,8 +321,7 @@ class _ApptList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (appointments.isEmpty) {
-      return _EmptyAppt(
-          title: emptyTitle, subtitle: emptySubtitle);
+      return _EmptyBookings(title: emptyTitle, subtitle: emptySubtitle);
     }
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
@@ -207,7 +341,7 @@ class _ApptList extends StatelessWidget {
   }
 }
 
-// ── Single appointment card ──────────────────────────────────────────────────
+// ── Single booking card ──────────────────────────────────────────────────────
 
 class _AppointmentCard extends StatelessWidget {
   const _AppointmentCard({
@@ -257,46 +391,92 @@ class _AppointmentCard extends StatelessWidget {
     final dateStr = DateFormat('EEE, d MMM yyyy').format(appt.appointmentTime);
     final timeStr = DateFormat('h:mm a').format(appt.appointmentTime);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF131B2E) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE4E7EC),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.15 : 0.045),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF131B2E) : Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color:
+                  isDark ? const Color(0xFF1E293B) : const Color(0xFFE4E7EC),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-              child: Row(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.15 : 0.045),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      appt.propertyTitle,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: primary.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Icon(
+                      Icons.event_available_rounded,
+                      color: primary,
+                      size: 22,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          appt.propertyTitle,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 14,
+                              color:
+                                  theme.colorScheme.onSurface.withOpacity(0.45),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                appt.propertyLocation,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.55),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(20),
@@ -305,117 +485,115 @@ class _AppointmentCard extends StatelessWidget {
                       _statusLabel(appt.status),
                       style: TextStyle(
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         color: statusColor,
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-              child: Row(children: [
-                Icon(Icons.location_on_outlined,
-                    size: 13,
-                    color: theme.colorScheme.onSurface.withOpacity(0.45)),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    appt.propertyLocation,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+              Container(
+                margin: const EdgeInsets.only(top: 14),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: primary.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: primary.withOpacity(0.12)),
                 ),
-              ]),
-            ),
-
-            // Date/time strip
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: primary.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: primary.withOpacity(0.12)),
-              ),
-              child: Row(
-                children: [
-                  _InfoChip(
+                child: Wrap(
+                  spacing: 14,
+                  runSpacing: 10,
+                  children: [
+                    _InfoChip(
                       icon: Icons.calendar_today_rounded,
                       label: dateStr,
-                      color: primary),
-                  const SizedBox(width: 16),
-                  _InfoChip(
+                      color: primary,
+                    ),
+                    _InfoChip(
                       icon: Icons.access_time_rounded,
                       label: timeStr,
-                      color: primary),
-                  const Spacer(),
-                  _InfoChip(
+                      color: primary,
+                    ),
+                    _InfoChip(
                       icon: Icons.timelapse_rounded,
                       label: appt.duration,
-                      color: primary),
-                ],
+                      color: primary,
+                    ),
+                  ],
+                ),
               ),
-            ),
-
-            // Purpose + notes
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: Wrap(spacing: 8, children: [
-                _Tag(label: appt.purpose),
-                if (appt.notes != null && appt.notes!.isNotEmpty)
-                  _Tag(label: appt.notes!.length > 30
-                      ? '${appt.notes!.substring(0, 30)}…'
-                      : appt.notes!),
-              ]),
-            ),
-
-            // Actions
-            if (onCancel != null || onDelete != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                padding: const EdgeInsets.only(top: 10),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    if (onDelete != null)
-                      TextButton.icon(
-                        onPressed: onDelete,
-                        icon: const Icon(Icons.delete_outline_rounded,
-                            size: 15, color: Colors.red),
-                        label: const Text('Remove',
-                            style: TextStyle(
-                                color: Colors.red, fontSize: 12)),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                        ),
-                      ),
-                    if (onCancel != null)
-                      TextButton.icon(
-                        onPressed: onCancel,
-                        icon: Icon(Icons.cancel_outlined,
-                            size: 15,
-                            color: Colors.red.shade400),
-                        label: Text('Cancel Appt.',
-                            style: TextStyle(
-                                color: Colors.red.shade400, fontSize: 12)),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                        ),
+                    _Tag(label: appt.purpose),
+                    if (appt.notes != null && appt.notes!.isNotEmpty)
+                      _Tag(
+                        label: appt.notes!.length > 30
+                            ? '${appt.notes!.substring(0, 30)}…'
+                            : appt.notes!,
                       ),
                   ],
                 ),
               ),
-            if (onCancel == null && onDelete == null)
-              const SizedBox(height: 14),
-          ],
+              if (onCancel != null || onDelete != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      if (onDelete != null)
+                        TextButton.icon(
+                          onPressed: onDelete,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 15,
+                            color: Colors.red,
+                          ),
+                          label: const Text(
+                            'Remove',
+                            style: TextStyle(color: Colors.red, fontSize: 12),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                          ),
+                        ),
+                      if (onCancel != null)
+                        TextButton.icon(
+                          onPressed: onCancel,
+                          icon: Icon(
+                            Icons.cancel_outlined,
+                            size: 14,
+                            color: Colors.red.shade400,
+                          ),
+                          label: Text(
+                            'Cancel booking',
+                            style: TextStyle(
+                              color: Colors.red.shade400,
+                              fontSize: 12,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              if (onCancel == null && onDelete == null)
+                const SizedBox(height: 2),
+            ],
+          ),
         ),
       ),
     );
@@ -466,8 +644,8 @@ class _Tag extends StatelessWidget {
   }
 }
 
-class _EmptyAppt extends StatelessWidget {
-  const _EmptyAppt({required this.title, required this.subtitle});
+class _EmptyBookings extends StatelessWidget {
+  const _EmptyBookings({required this.title, required this.subtitle});
   final String title;
   final String subtitle;
   @override
@@ -485,7 +663,7 @@ class _EmptyAppt extends StatelessWidget {
                 color: navy.withOpacity(0.08),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.event_outlined,
+              child: Icon(Icons.calendar_month_outlined,
                   size: 48, color: navy.withOpacity(0.4)),
             ),
             const SizedBox(height: 20),
